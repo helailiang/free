@@ -483,24 +483,35 @@ class R2SingleScanRadar:
             self._emit_scan_log("[R2] 探测设备扫描参数失败：数据 TCP 未建立。")
             return int(self._points_per_circle)
         try:
-            hdr, _payload = read_one_scan_packet(sock)
+            # 与 ``assemble_one_full_scan`` 内部用法保持一致：``read_one_scan_packet`` 只返回
+            # **整包字节流**（含表 4-6 的固定头 + 可变长 ScanData），随后必须经
+            # ``parse_scan_packet`` 解出 ``(R2ScanHeader, point_bytes, ...)``。
+            # 之前误写成 2-tuple 解包，会触发 "too many values to unpack (expected 2)"。
+            raw_pkt = read_one_scan_packet(sock)
+            hdr, _point_bytes, _tail = parse_scan_packet(raw_pkt)
         except Exception as exc:  # noqa: BLE001 — 探测失败不应中断连接流程
             self._emit_scan_log(f"[R2] 探测设备扫描参数失败：读包异常 {exc!r}。")
             return int(self._points_per_circle)
 
         samples = int(hdr.samples_per_scan)
-        step_cdeg = int(hdr.angle_step_centi_deg)
-        first_cdeg = int(hdr.first_angle_centi_deg)
+        # 注意：``R2ScanHeader`` 里这两个字段名虽叫 ``_centi_deg``（百分之一度），但 R2 表 4-6 明文规定
+        # 单位是 **1/10000°**（万分之一度）。例如 0.2°/index 设备的包头会给 angle_step=2000、
+        # 0.1°/index 设备给 1000；若按 1/100 解算会把 0.2° 错算成 20°。命名是上游
+        # ``r2_client.parse_scan_packet`` 的历史遗留，此处只按协议规定的真实单位解换。
+        step_raw = int(hdr.angle_step_centi_deg)      # 实为 1/10000 度
+        first_raw = int(hdr.first_angle_centi_deg)    # 实为 1/10000 度
         # 异常防护：固件偶尔返回 0，回落到 GUI 默认值，避免下游除零 / 死循环。
-        if samples <= 0 or step_cdeg <= 0:
+        if samples <= 0 or step_raw <= 0:
             self._emit_scan_log(
-                f"[R2] 探测到非法包头：samples_per_scan={samples}, angle_step={step_cdeg}（厘度），"
+                f"[R2] 探测到非法包头：samples_per_scan={samples}, "
+                f"angle_step_raw={step_raw}（1/10000°），"
                 f"放弃覆盖，沿用默认 points_per_circle={int(self._points_per_circle)}。"
             )
             return int(self._points_per_circle)
 
-        step_deg = step_cdeg / 100.0
-        first_deg = first_cdeg / 100.0
+        # 1/10000° → °：除以 10000.0
+        step_deg = step_raw / 10000.0
+        first_deg = first_raw / 10000.0
         fov_deg = samples * step_deg
         gui_step = float(self.angular_resolution_deg)
         gui_start = float(self.start_angle_deg)
