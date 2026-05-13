@@ -1,0 +1,14 @@
+[project]
+name = "h2-resolution-gui"
+version = "0.1.0"
+description = "H2 单次点云 + Y100SC 角分辨率测试（PySide6），入口 h2_resolution_gui_test.py"
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6>=6.5",
+    "pyserial>=3.5",
+    "openpyxl>=3.1",
+]
+
+# 仅打包时需要；`uv sync --group build` 后执行 `uv run pyinstaller ...`
+[dependency-groups]
+build = ["pyinstaller>=6.0"]

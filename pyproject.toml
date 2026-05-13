@@ -1,0 +1,8 @@
+[project]
+name = "free"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "nuitka>=4.1",
+  "pyserial>=3.5",
+]

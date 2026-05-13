@@ -1,0 +1,553 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>920</width>
+    <height>720</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>H1 角分辨率 / 转台步进验证</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout_main">
+    <item>
+     <widget class="QGroupBox" name="groupRadar">
+      <property name="title">
+       <string>雷达（标定取数，与盲区测试脚本一致）</string>
+      </property>
+      <layout class="QGridLayout" name="gridRadar">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>IP</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="leRadarIp">
+         <property name="text">
+          <string>192.168.1.111</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>端口</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="3">
+        <widget class="QLineEdit" name="leRadarPort">
+         <property name="text">
+          <string>2111</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="4">
+        <widget class="QPushButton" name="btnRadarConnect">
+         <property name="text">
+          <string>连接</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="5">
+        <widget class="QPushButton" name="btnRadarDisconnect">
+         <property name="text">
+          <string>断开</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0" colspan="2">
+        <widget class="QLabel" name="lblRadarState">
+         <property name="text">
+          <string>雷达：未连接</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2" colspan="2">
+        <widget class="QLabel" name="label_angres">
+         <property name="text">
+          <string>角分辨率(°/index)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="4">
+        <widget class="QDoubleSpinBox" name="dsbAngularResDeg">
+         <property name="decimals">
+          <number>3</number>
+         </property>
+         <property name="minimum">
+          <double>0.001000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>10.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>0.010000000000000</double>
+         </property>
+         <property name="value">
+          <double>0.100000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_si">
+         <property name="text">
+          <string>索引起</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QSpinBox" name="sbIndexStart">
+         <property name="maximum">
+          <number>10000</number>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="2">
+        <widget class="QLabel" name="label_ei">
+         <property name="text">
+          <string>索引止</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="3">
+        <widget class="QSpinBox" name="sbIndexEnd">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>10000</number>
+         </property>
+         <property name="value">
+          <number>2701</number>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="4">
+        <widget class="QLabel" name="label_md">
+         <property name="text">
+          <string>最大距离(mm)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="5">
+        <widget class="QSpinBox" name="sbMaxDistanceMm">
+         <property name="minimum">
+          <number>20</number>
+         </property>
+         <property name="maximum">
+          <number>50000</number>
+         </property>
+         <property name="value">
+          <number>12000</number>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="label_min_d">
+         <property name="text">
+          <string>最小距离(mm)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QSpinBox" name="sbMinDistanceMm">
+         <property name="maximum">
+          <number>49990</number>
+         </property>
+         <property name="value">
+          <number>10</number>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="2" colspan="4">
+        <widget class="QLabel" name="label_min_hint">
+         <property name="text">
+          <string>目标段判定：最小距离 &lt; r &lt; 最大距离（须 最小 &lt; 最大）</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupTurntable">
+      <property name="title">
+       <string>Y100SC 转台（1°=400 脉冲时，0.1°≈40，可改）</string>
+      </property>
+      <layout class="QGridLayout" name="gridTurntable">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_com">
+         <property name="text">
+          <string>串口</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="leComPort">
+         <property name="text">
+          <string>COM6</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QLabel" name="label_baud">
+         <property name="text">
+          <string>波特率</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="3">
+        <widget class="QSpinBox" name="sbBaud">
+         <property name="maximum">
+          <number>921600</number>
+         </property>
+         <property name="value">
+          <number>9600</number>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="4">
+        <widget class="QLabel" name="label_axis">
+         <property name="text">
+          <string>轴</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="5">
+        <widget class="QComboBox" name="cmbAxis">
+         <item>
+          <property name="text">
+           <string>X</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Y</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Z</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>r</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>t</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>T</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_steps">
+         <property name="text">
+          <string>每步脉冲(0.1°)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QSpinBox" name="sbPulsePerStep">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>10000</number>
+         </property>
+         <property name="value">
+          <number>40</number>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QLabel" name="label_dir">
+         <property name="text">
+          <string>方向</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="3">
+        <widget class="QComboBox" name="cmbDir">
+         <item>
+          <property name="text">
+           <string>+</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>-</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="1" column="4">
+        <widget class="QLabel" name="label_settle">
+         <property name="text">
+          <string>到位后等待(ms)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="5">
+        <widget class="QSpinBox" name="sbSettleMs">
+         <property name="maximum">
+          <number>60000</number>
+         </property>
+         <property name="value">
+          <number>300</number>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0" colspan="3">
+        <widget class="QLabel" name="lblTurntableState">
+         <property name="text">
+          <string>转台：未操作</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="3" colspan="3">
+        <widget class="QLabel" name="label_theory">
+         <property name="text">
+          <string>理论转角(°)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="5">
+        <widget class="QDoubleSpinBox" name="dsbTheoryDeg">
+         <property name="decimals">
+          <number>3</number>
+         </property>
+         <property name="maximum">
+          <double>360.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>0.100000000000000</double>
+         </property>
+         <property name="value">
+          <double>0.100000000000000</double>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupFlow">
+      <property name="title">
+       <string>测试流程（pre.md）</string>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout_flow">
+       <item>
+        <widget class="QPushButton" name="btnCaptureBefore">
+         <property name="text">
+          <string>1 采集初始</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnTurntableMove">
+         <property name="text">
+          <string>2 转台一步</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnCaptureAfter">
+         <property name="text">
+          <string>3 采集旋转后</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnCompute">
+         <property name="text">
+          <string>计算 Δindex / 误差</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnRunFullCycle">
+         <property name="text">
+          <string>一键单轮(采1→转→等→采2→算)</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupResult">
+      <property name="title">
+       <string>单次结果</string>
+      </property>
+      <layout class="QFormLayout" name="formLayout_result">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_r1">
+         <property name="text">
+          <string>初始 中心index / r(mm) / 段内index范围</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLabel" name="lblCapBefore">
+         <property name="text">
+          <string>—</string>
+         </property>
+         <property name="textInteractionFlags">
+          <set>Qt::TextSelectableByMouse</set>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_r2">
+         <property name="text">
+          <string>旋转后 中心index / r(mm) / 段内index范围</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QLabel" name="lblCapAfter">
+         <property name="text">
+          <string>—</string>
+         </property>
+         <property name="textInteractionFlags">
+          <set>Qt::TextSelectableByMouse</set>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_d">
+         <property name="text">
+          <string>Δindex、Δθ(°)、误差(°)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QLabel" name="lblDelta">
+         <property name="text">
+          <string>—</string>
+         </property>
+         <property name="textInteractionFlags">
+          <set>Qt::TextSelectableByMouse</set>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupRepeat">
+      <property name="title">
+       <string>重复测试与统计</string>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout_repeat">
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_rep">
+         <item>
+          <widget class="QLabel" name="label_rep">
+           <property name="text">
+            <string>重复次数</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="sbRepeatCount">
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>500</number>
+           </property>
+           <property name="value">
+            <number>10</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnRepeatStart">
+           <property name="text">
+            <string>开始重复（每轮自动归零差分：采前→转→采后→算）</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnRepeatStop">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="text">
+            <string>停止</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="lblRepeatStats">
+         <property name="text">
+          <string>统计：—</string>
+         </property>
+         <property name="textInteractionFlags">
+          <set>Qt::TextSelectableByMouse</set>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTableWidget" name="tableHistory">
+         <property name="columnCount">
+          <number>5</number>
+         </property>
+         <property name="rowCount">
+          <number>0</number>
+         </property>
+         <attribute name="horizontalHeaderDefaultSectionSize">
+          <number>120</number>
+         </attribute>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPlainTextEdit" name="teLog">
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>180</height>
+       </size>
+      </property>
+      <property name="maximumBlockCount">
+       <number>500</number>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+      <property name="lineWrapMode">
+       <enum>QPlainTextEdit::WidgetWidth</enum>
+      </property>
+      <property name="placeholderText">
+       <string>日志（可上下滚动，新行自动滚到底部）</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

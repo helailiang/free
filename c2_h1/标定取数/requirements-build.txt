@@ -1,0 +1,3 @@
+# 仅用于打包 h1标定取数.py（与运行 GUI 所需）
+PySide6>=6.6
+pyinstaller>=6.0
