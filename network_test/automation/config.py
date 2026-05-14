@@ -1,0 +1,171 @@
+"""
+自动化测试配置读取。
+
+设计原则：
+1. 不强依赖 PyYAML 等额外库，第一版使用 Python 标准库可直接解析的 JSON。
+2. 把 C2/H1 的网络参数、协议命令和准入阈值放入配置文件，避免现场换设备时改代码。
+3. 保留 H1/H2 命名兼容：项目历史文件里有 h2 命名，但业务上按用户确认统一视为 H1。
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+import json
+from pathlib import Path
+from typing import Any, Literal
+
+RadarModel = Literal["c2", "h1"]
+
+
+@dataclass(slots=True)
+class ThresholdConfig:
+    """测试准入阈值，单位在字段名中尽量显式标出，便于报告和现场复核。"""
+
+    ping_success_rate_min_percent: float = 99.9
+    protocol_success_rate_min_percent: float = 100.0
+    c2_recovery_timeout_s: float = 10.0
+    h1_recovery_timeout_s: float = 5.0
+    stream_loss_rate_max_percent: float = 1.0
+    h1_stream_loss_rate_max_percent: float = 0.5
+    frame_rate_tolerance_percent: float = 10.0
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any] | None) -> "ThresholdConfig":
+        """从配置字典构造阈值；未知字段忽略，避免后续扩展配置时破坏旧脚本。"""
+        if not raw:
+            return cls()
+        allowed = {field.name for field in cls.__dataclass_fields__.values()}
+        return cls(**{k: v for k, v in raw.items() if k in allowed})
+
+
+@dataclass(slots=True)
+class StreamConfig:
+    """连续取数相关配置，覆盖 C2/H1 第一阶段共同需要的统计维度。"""
+
+    sample_cycles: int = 5
+    sample_duration_s: float = 10.0
+    expected_points_per_scan: int = 2701
+    expected_packets_per_scan: int = 22
+    scan_start_deg: float = -45.0
+    angle_resolution_deg: float = 0.1
+    expected_frame_rate_hz: float = 30.0
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any] | None) -> "StreamConfig":
+        """读取取数配置，默认值按 H1/C2 常见 270°、0.1°、30Hz 测试场景设置。"""
+        if not raw:
+            return cls()
+        allowed = {field.name for field in cls.__dataclass_fields__.values()}
+        return cls(**{k: v for k, v in raw.items() if k in allowed})
+
+
+@dataclass(slots=True)
+class CommandConfig:
+    """
+    设备协议命令配置。
+
+    H1 依据 H1E0-02A 说明书第 4 章表 4-2，C2 第一版先按现有 C200 压力测试脚本中
+    已验证的启动/停止/配置查询命令执行。字段保存为带空格或不带空格的 hex 字符串均可。
+    """
+
+    h1_login_permission: int = 3
+    h1_login_password_hex: str = "F4 72 47 44"
+    single_scan_hex: str = "02 02 02 02 00 09 02 30 43"
+    start_stream_hex: str = "02 02 02 02 00 0A 02 31 01 46"
+    stop_stream_hex: str = "02 02 02 02 00 0A 02 31 00 45"
+    c2_query_config_hex: str = "02 02 02 02 00 09 00 1A 2B"
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any] | None) -> "CommandConfig":
+        """读取命令配置；命令来自现场脚本时通常是 hex 文本，所以统一延后转 bytes。"""
+        if not raw:
+            return cls()
+        allowed = {field.name for field in cls.__dataclass_fields__.values()}
+        return cls(**{k: v for k, v in raw.items() if k in allowed})
+
+
+@dataclass(slots=True)
+class DeviceConfig:
+    """单台雷达的自动化测试配置。"""
+
+    model: RadarModel
+    host: str
+    port: int = 2111
+    name: str = "radar"
+    connect_timeout_s: float = 5.0
+    recv_timeout_s: float = 0.5
+    report_dir: str = "network_test/automation/reports_output"
+    raw_dir: str = "network_test/automation/raw_output"
+    commands: CommandConfig = field(default_factory=CommandConfig)
+    stream: StreamConfig = field(default_factory=StreamConfig)
+    thresholds: ThresholdConfig = field(default_factory=ThresholdConfig)
+
+    @property
+    def normalized_model(self) -> RadarModel:
+        """把历史 h2 叫法归一到 h1，防止旧配置或旧文件名影响后续测试判断。"""
+        return "h1" if str(self.model).lower() in {"h1", "h2"} else "c2"
+
+    @property
+    def recovery_timeout_s(self) -> float:
+        """按型号返回恢复时间准入阈值：方案建议 C2 10 秒，H1 5 秒。"""
+        if self.normalized_model == "h1":
+            return float(self.thresholds.h1_recovery_timeout_s)
+        return float(self.thresholds.c2_recovery_timeout_s)
+
+    @property
+    def stream_loss_limit_percent(self) -> float:
+        """按型号返回应用层丢包/缺包准入阈值，H1 默认更严格。"""
+        if self.normalized_model == "h1":
+            return float(self.thresholds.h1_stream_loss_rate_max_percent)
+        return float(self.thresholds.stream_loss_rate_max_percent)
+
+
+def clean_hex(hex_text: str) -> str:
+    """清理命令中的空格、换行和 0x 前缀，保证 `bytes.fromhex` 能稳定解析。"""
+    return (
+        hex_text.replace("0x", "")
+        .replace("0X", "")
+        .replace(" ", "")
+        .replace("\n", "")
+        .replace("\t", "")
+    )
+
+
+def hex_to_bytes(hex_text: str) -> bytes:
+    """把现场文档或脚本里常见的 hex 文本转换为字节命令。"""
+    cleaned = clean_hex(hex_text)
+    if len(cleaned) % 2 != 0:
+        raise ValueError(f"hex 命令长度必须为偶数: {hex_text!r}")
+    return bytes.fromhex(cleaned)
+
+
+def load_device_config(path: str | Path) -> DeviceConfig:
+    """
+    从 JSON 文件读取设备配置。
+
+    配置文件只描述一台设备，批量测试时由命令行或 CI 分多次调用，避免多个设备之间
+    的失败原因互相干扰。
+    """
+    p = Path(path)
+    with p.open("r", encoding="utf-8") as f:
+        raw = json.load(f)
+
+    model = str(raw.get("model", "")).lower()
+    if model == "h2":
+        model = "h1"
+    if model not in {"c2", "h1"}:
+        raise ValueError("model 必须是 c2、h1 或历史兼容写法 h2")
+
+    return DeviceConfig(
+        model=model,  # type: ignore[arg-type]
+        host=str(raw["host"]),
+        port=int(raw.get("port", 2111)),
+        name=str(raw.get("name", model.upper())),
+        connect_timeout_s=float(raw.get("connect_timeout_s", 5.0)),
+        recv_timeout_s=float(raw.get("recv_timeout_s", 0.5)),
+        report_dir=str(raw.get("report_dir", "network_test/automation/reports_output")),
+        raw_dir=str(raw.get("raw_dir", "network_test/automation/raw_output")),
+        commands=CommandConfig.from_dict(raw.get("commands")),
+        stream=StreamConfig.from_dict(raw.get("stream")),
+        thresholds=ThresholdConfig.from_dict(raw.get("thresholds")),
+    )

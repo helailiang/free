@@ -1,0 +1,30 @@
+{
+  "name": "C2-样机",
+  "model": "c2",
+  "host": "192.168.10.7",
+  "port": 2111,
+  "connect_timeout_s": 5.0,
+  "recv_timeout_s": 0.5,
+  "report_dir": "network_test/automation/reports_output",
+  "raw_dir": "network_test/automation/raw_output",
+  "commands": {
+    "start_stream_hex": "02 02 02 02 00 0A 02 31 01 46",
+    "stop_stream_hex": "02 02 02 02 00 0A 02 31 00 45",
+    "c2_query_config_hex": "02 02 02 02 00 09 00 1A 2B"
+  },
+  "stream": {
+    "sample_cycles": 5,
+    "sample_duration_s": 10.0,
+    "expected_points_per_scan": 2701,
+    "expected_packets_per_scan": 22,
+    "scan_start_deg": -45.0,
+    "angle_resolution_deg": 0.1,
+    "expected_frame_rate_hz": 30.0
+  },
+  "thresholds": {
+    "protocol_success_rate_min_percent": 100.0,
+    "c2_recovery_timeout_s": 10.0,
+    "stream_loss_rate_max_percent": 1.0,
+    "frame_rate_tolerance_percent": 10.0
+  }
+}

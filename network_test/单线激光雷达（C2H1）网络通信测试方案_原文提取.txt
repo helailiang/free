@@ -1,0 +1,552 @@
+﻿
+单线激光雷达（C2/H1）网络通信测试方案
+1. 方案概述 
+1.1 测试目标 
+本方案旨在系统化验证单线激光雷达在各种复杂场景下的网络通信子系统性能，确保其满足高可靠性、低延迟、强抗干扰的工业应用要求，为产品量产与现场部署提供质量准入标准。
+
+1.2 测试范围 
+覆盖从物理连接到应用层、从静态验证到动态模拟的全维度测试，具体包括：
+硬件接口测试：物理连接、电源、线缆与端口。
+通信协议测试：协议合规性、指令兼容性、IP配置与发现。
+网络健壮性测试：抗干扰、异常恢复、压力与稳定性。
+整机集成测试：车载环境适应性、运动性能、多设备协同。
+安全与可靠性测试：长期运行、基础安全防护。
+
+2. 测试通过标准（量化） 
+所有测试项必须满足以下最低标准：
+测试类别​
+评价指标​
+C2系列标准​
+H1系列标准​
+通用标准​
+基础性能​
+网络延迟 (局域网)
+< 2ms
+< 2ms
+
+
+协议响应正确率
+100%
+100%
+100%
+
+数据完整性 (168小时)
+0 丢包
+0 丢包
+0 丢包
+压力容错​
+应用层丢包率 (1%丢包+100ms延迟)
+≤ 1%
+≤ 0.5%
+-
+异常恢复​
+断线自动重连恢复时间
+≤ 10秒
+≤ 5秒
+-
+长期稳定​
+168小时内存增长
+0 丢包
+0 丢包
+无崩溃
+动态性能​
+运动下帧率波动 (1.5-4m/s)
+≤ ±10%
+≤ ±10%
+-
+
+
+
+
+
+
+
+
+
+3. 测试环境与设备清单 
+3.1 硬件清单 
+设备名称​
+规格要求​
+数量​
+用途说明​
+被测雷达​
+被测雷达
+N台
+主测及组网测试
+工业交换机​
+全千兆管理型交换机
+2台
+核心组网设备，支持VLAN、流量监控
+网络损伤模拟仪​
+支持延迟、抖动、丢包、乱序注入
+1台
+模拟恶劣网络环境
+工控机/服务器​
+多网口，预装Ubuntu 20.04/Windows 10、ROS2 
+2台
+测试主控、数据接收与分析
+可编程直流电源​
+0-30V， 0-5A， 可编程序列
+2台
+电源适应性及上电时序测试
+移动小车/转台​
+速度≥4m/s， 可编程控制
+1套
+动态性能测试
+示波器​
+带宽≥100MHz
+1台
+电源纹波、信号质量检测
+线缆​
+CAT5e及以上标准网线
+若干
+连接，建议包含不同长度（1m， 5m， 10m， 15m）
+
+3.2 软件与工具清单 
+工具名称​
+版本/要求​
+用途​
+测试自动化框架​
+基于Python 3.8+， 含Pytest
+自动化执行用例，生成报告
+网络协议分析工具​
+Wireshark 3.6+
+深度协议分析、丢包/延迟/抖动测量
+流量生成与压力工具​
+Iperf3, Ostinato, Scapy
+制造背景流量、构造异常数据包
+雷达配置与发现工具​
+上位机
+IP配置、参数设置、固件升级、网络发现
+网络扫描与诊断工具​
+Nmap, Angry IP Scanner
+端口扫描、IP冲突检测、网络拓扑发现
+性能监控脚本​
+自定义Python/Shell脚本
+实时监控系统资源、网络连接状态、数据流统计
+
+4. 详细测试用例 
+4.1 硬件与连接测试 
+用例编号​
+测试项​
+测试步骤​
+预期结果​
+HW-01​
+电源适应性
+1. 在规格范围内调节电压 (C2:9-26V; H1:12-26V)。2. 模拟汽车抛负载等瞬态脉冲。3. 施加±5%纹波噪声。
+雷达工作正常，无重启、死机或数据异常。通信连接稳定。
+HW-02​
+接口与线缆
+1. 对网口进行100次插拔循环。2. 使用不同长度（1m， 5m， 10m， 15m）CAT5e/6线缆连接。3. 进行线缆弯折、拉伸测试。（7天）
+接口无物理损坏，连接功能正常。各长度线缆下通信稳定，无速率下降或误码。
+HW-03​
+网络基础连通性
+1. 配置雷达与测试机在同一子网静态IP。2. 执行持续ping测试，记录成功率与平均延迟。（7天）
+Ping成功率 ≥ 99.9%，平均延迟满足第2部分标准。
+
+
+4.2 通信协议与配置测试 
+用例编号​
+测试项​
+测试步骤 ​
+预期结果​
+PROT-01​
+IP配置与发现
+1. 测试静态IP配置、保存与重启生效。2. 测试DHCP自动获取IP（若支持）。3. 使用或协议广播发现设备。
+IP配置正确持久化，设备可被成功发现并访问。
+PROT-02​
+应用层协议
+1. 通过TCP/UDP发送标准指令集（如启动/停止数据流、查询状态、设置参数）。2. 验证点云数据/目标列表输出格式、频率、内容正确性。
+指令响应正确、及时，数据流连续、格式符合协议定义。
+PROT-03​
+协议健壮性
+1. 发送非标、畸形、超长、碎片化数据包。2. 模拟协议状态机异常序列（如未握手先发数据）。(固件)3. 高频率重复建立/断开连接。
+设备能优雅处理异常，丢弃非法数据，不崩溃，核心功能不受影响。正常会话可快速恢复。
+PROT-04​
+多客户端连接
+模拟多个上位机同时连接雷达的数据端口或配置端口。
+行为符合设计预期（如：仅允许一个配置连接，允许多个数据订阅连接）。
+4.3 网络健壮性测试 
+用例编号​
+测试项​
+测试步骤​
+预期结果​
+NET-01​
+网络损伤测试
+通过网络损伤仪，在雷达与上位机之间依次注入：1. 固定延迟 (10ms, 50ms, 100ms, 200ms)2. 随机抖动 (±10ms, ±30ms)3. 丢包率 (0.1%， 0.5%， 1%， 3%)4. 包乱序、重复监测应用层数据流的连续性、延迟和丢包率。
+满足第2部分中“压力容错”标准。在高延迟和丢包下，应用层逻辑应保持，不因单包丢失导致整个会话失效。
+NET-02​
+异常与恢复
+1. 物理层中断：运行中拔插网线。2. 网络层冲突：制造IP地址冲突。3. 网络设备重启：重启连接的交换机。4. ARP欺骗/泛洪攻击：模拟简单网络攻击。记录从故障发生到应用层数据流完全恢复的时间及状态。
+满足第2部分中“异常恢复”时间标准。恢复后数据完整，无错乱。能抵御基础的ARP欺骗，通信不中断或被劫持。
+NET-03​
+带宽压力与背景流量
+1. 使用Iperf3在测试网络内制造超过80%链路带宽的UDP/TCP背景流量。2. 测试雷达在满带宽（或接近满带宽）传输自身数据时的表现。
+雷达数据流仍能维持，丢包率和延迟在可接受范围内。系统CPU/内存占用无异常飙升。
+NET-04​
+组播/广播流量影响
+在局域网内持续发送高频率的组播和广播包。
+雷达通信不受影响，自身协议栈不被广播风暴拖垮。
+
+4.4 整机集成与动态测试 
+用例编号​
+测试项​
+测试步骤​
+预期结果​
+SYS-01​
+车载环境适应性
+雷达安装于移动小车，在以下工况持续测试：1. 不同速度行驶（0-最大设计速度）。2. 加速/制动/转弯。3. 行驶过颠簸路面。实时监控网络连接状态、TCP重传率、点云数据帧率。
+网络连接无中断，点云数据输出连续、稳定，帧率波动满足标准。
+SYS-02​
+多雷达组网与干扰
+1. 将多台C2/H1雷达接入同一交换机，配置为连续工作模式。2. 所有雷达同时向上位机发送数据。3. 监控交换机端口带宽、各雷达数据流的独立性。
+各雷达数据流独立，无串扰。交换机无阻塞，各雷达性能不受彼此影响或影响在预期内。
+SYS-03​
+多传感器系统共存
+雷达与车载摄像头、毫米波雷达、GPS/IMU等设备接入同一网络，并同时工作。
+雷达通信正常，与其它传感器数据流和平共存，网络带宽分配合理，无性能劣化。
+4.5 安全与可靠性测试 
+用例编号​
+测试项​
+测试步骤​
+预期结果​
+REL-01​
+长期稳定性测试
+雷达上电，以最大负载或典型负载持续运行72小时以上。监控：1. 网络连接状态（有无中断、重连）。2. 系统资源（内存、TCP连接数）。3. 应用层数据统计（总帧数、丢帧数）。
+无连接中断，内存无泄漏（增长满足标准），无TCP连接泄漏，数据累计丢帧率几乎为0。
+REL-02​
+固件升级可靠性
+1. 正常升级流程验证。2. 升级过程中断电，然后上电。3. 传输损坏的固件包。(H1重点执行2000次压力循环)
+正常升级成功。异常升级场景下，设备应进入安全模式或恢复出厂固件，不应变砖。
+SEC-01​
+网络安全扫描
+1. 使用Nmap扫描雷达所有开放端口（TCP/UDP）。2. 尝试对开放端口进行常见漏洞探测（如弱口令、缓冲区溢出）。3. 尝试从非配置IP地址访问雷达服务。
+仅开放业务必需的端口（如数据端口、配置端口）。无已知高危漏洞。拒绝非授权IP的访问。
+SEC-02​
+协议模糊测试
+使用模糊测试工具（如Boofuzz、Peach Fuzzer）向雷达的所有开放端口发送随机、畸形的数据包。
+设备不应崩溃、重启或泄露敏感信息。应有适当的异常处理机制。
+
+
+4.5 ROS驱动测试
+用例编号​
+测试项​
+测试步骤​
+预期结果​
+​ros-01
+ROS驱动点云测试
+
+
+
+ros-02
+ROS驱动取数健壮性测试
+
+
+
+ros-03
+ROS驱动健壮性测试
+
+
+
+ros-04
+ROS驱动中断测试
+
+
+
+5. 自动化测试框架---Python（测试雷达）
+框架设计要求：
+插件化架构：新增雷达型号只需添加驱动和配置文件；
+配置驱动：测试参数与代码分离，便于维护；
+统一接口：通过抽象基类实现测试用例与具体型号解耦；
+模块化工具：通用功能模块化，提高复用性；
+完整报告：自动生成包含图表、统计的测试报告；
+CI/CD：支持命令行执行，便于集成；
+
+扩展建议 ：
+添加数据库支持：将测试结果存入数据库，便于历史数据对比；
+增加Web界面：提供图形化的测试配置和结果查看；
+支持更多测试设备：添加更多网络损伤仪、电源控制器的驱动；
+性能基线管理：建立性能基线，自动检测性能回归；
+分布式测试：支持在多台机器上分布式执行测试；
+本测试框架采用模块化、可扩展、可复用的设计理念，专门针对单线激光雷达的网络通信测试而设计。
+radar_comm_test_suite/
+├── drivers/                    # 雷达驱动抽象层
+│   ├── base_radar_driver.py  # 定义通用接口 (connect, get_data, send_cmd...)
+│   ├── c2_ethernet_driver.py # C2网口驱动实现
+│   └── h1_gigabit_driver.py # H1千兆网口驱动实现
+├── test_cases/              # 测试用例集
+│   ├── conftest.py          # Pytest共享配置
+│   ├── test_hardware.py     # HW系列用例
+│   ├── test_protocol.py     # PROT系列用例
+│   ├── test_network_stress.py # NET系列用例
+│   ├── test_system.py       # SYS系列用例
+│   └── test_reliability.py  # REL/SEC系列用例
+├── utils/                   # 工具与辅助模块
+│   ├── network_impairment.py # 控制损伤仪的封装
+│   ├── traffic_generator.py  # 基于Scapy的流量生成
+│   ├── result_collector.py   # 性能数据收集
+│   └── report_generator.py   # 生成HTML/JSON报告
+├── config/                  # 配置文件
+│   ├── c2_config.yaml       # C2测试参数 (IP, 端口, 协议细节)
+│   └── h1_config.yaml       # H1测试参数
+├── fixtures/                # 测试夹具 (如模拟小车控制)
+└── run_suite.py            # 主执行入口，支持选择型号和测试集
+框架基于Python和Pytest构建，支持自动化执行、结果收集和报告生成。
+5.1 drivers/ - 雷达驱动抽象层 
+此目录包含雷达硬件通信的核心抽象和实现，实现设备无关性。
+文件
+功能描述
+核心接口/类
+base_radar_driver.py​
+抽象基类，定义所有雷达驱动的统一接口
+BaseRadarDriver• connect(config: dict) -> bool• disconnect() -> None• get_distance_data() -> List[float]• send_command(cmd: str) -> str• start_streaming() -> None• stop_streaming() -> None
+c2_ethernet_driver.py​
+C2型号雷达的具体实现
+C2EthernetDriver(BaseRadarDriver)• 实现TCP连接（默认端口8080）• 解析C2专用协议格式• 实现C2特有指令集
+h1_gigabit_driver.py​
+H1型号雷达的具体实现
+H1GigabitDriver(BaseRadarDriver)• 实现千兆以太网通信• 支持PTP时间同步• 处理高带宽点云数据
+设计优势：通过抽象基类，测试用例可以统一调用get_distance_data()，无需关心底层雷达型号。
+5.2 test_cases/ - 测试用例集 
+基于Pytest框架组织的测试用例，按测试类型分类。
+文件
+对应测试类别
+主要测试函数示例
+conftest.py​
+Pytest共享配置​
+定义pytest fixture：• @pytest.fixture(scope="session")• def radar_driver(config_name)• def network_impairment_tool()
+test_hardware.py​
+硬件测试(HW)
+def test_power_supply_adaption(radar_driver)def test_cable_durability()def test_interface_plug_unplug()
+test_protocol.py​
+协议测试(PROT)
+def test_ip_configuration()def test_command_response_time()def test_protocol_robustness()
+test_network_stress.py​
+网络压力测试(NET)
+def test_network_impairment()def test_packet_loss_recovery()def test_background_traffic_interference()
+test_system.py​
+系统集成测试(SYS)
+def test_vehicle_motion_scenario()def test_multi_radar_networking()def test_multi_sensor_coexistence()
+test_reliability.py​
+可靠性与安全(REL/SEC)
+def test_72_hour_stability()def test_firmware_upgrade_reliability()def test_security_port_scan()
+5.3 utils/ - 工具与辅助模块 
+可复用的通用工具函数和类，支持各种测试场景。
+文件
+核心功能
+关键函数/类
+network_impairment.py​
+网络损伤仪控制，提供API控制网络损伤仪，方便在NET测试中动态设置损伤参数。
+
+NetworkImpairmentController• set_latency(ms: int)• set_packet_loss(percent: float)• set_jitter(ms: int)• clear_all_impairments()
+traffic_generator.py​
+网络流量生成，可构造特定协议背景流量及攻击数据包，用于模拟复杂网络环境。
+
+TrafficGenerator• generate_udp_flood(target_ip, duration)• generate_broadcast_storm()• create_malformed_packets()
+result_collector.py​
+测试数据收集
+TestResultCollector• record_latency(timestamp, value)• record_packet_loss(count)• calculate_statistics()• export_to_csv(filename)
+report_generator.py​
+测试报告生成
+ReportGenerator• generate_html_report(results)• generate_json_report(results)• create_performance_charts(data)
+5.4 config/ - 配置文件目录 
+YAML格式的配置文件，实现测试参数与代码分离。
+c2_config.yaml示例：
+radar:
+  model: "C2"
+  ip_address: "192.168.1.100"
+  tcp_port: 8080
+  data_port: 8081
+  protocol:
+    command_format: "ASCII"
+    response_timeout: 1.0
+    retry_count: 3
+  test_parameters:
+    ping_count: 100
+    acceptable_latency_ms: 5
+    max_packet_loss_percent: 1
+h1_config.yaml示例：
+radar:
+  model: "H1"
+  ip_address: "192.168.1.101"
+  tcp_port: 8080
+  data_port: 8081
+  ptp_enabled: true
+  protocol:
+    command_format: "BINARY"
+    response_timeout: 0.5
+    retry_count: 3
+  test_parameters:
+    ping_count: 1000
+    acceptable_latency_ms: 2
+    max_packet_loss_percent: 0.5
+5.5 fixtures/ - 测试库
+定义复杂的测试环境和设备模拟。
+可能包含的文件
+功能
+vehicle_simulator.py​
+模拟小车运动控制
+power_supply_controller.py​
+可编程电源控制
+switch_controller.py​
+网络交换机管理
+5.6 run_suite.py - 主执行入口 
+测试套件的命令行入口，提供丰富的执行选项。
+解析命令行参数，加载对应型号的配置和驱动，按计划执行测试集，并生成带时间戳的详细报告
+核心功能：
+# 支持的参数示例
+"""
+用法: python run_suite.py [选项]
+选项:
+  --model TEXT         选择雷达型号 (c2, h1) [默认: c2]
+  --test-set TEXT      选择测试集 (all, hw, protocol, network, system, reliability)
+  --config FILE        指定配置文件路径
+  --output-dir DIR     指定报告输出目录
+  --parallel           并行执行测试
+  --list-tests        列出所有可用测试
+  --help              显示帮助信息
+"""
+执行流程：
+
+-8763049530
+框架执行流程 
+用户运行
+    ↓
+run_suite.py (解析参数，选择型号和测试集)
+    ↓
+加载对应配置文件 (config/c2_config.yaml 或 config/h1_config.yaml)
+    ↓
+初始化对应雷达驱动 (drivers/c2_ethernet_driver.py 或 drivers/h1_gigabit_driver.py)
+    ↓
+Pytest执行测试用例 (test_cases/下的对应测试文件)
+    ↓
+    ├── 执行测试用例
+    │   ├── 调用工具模块 (utils/下的功能)
+    │   ├── 收集测试结果
+    │   └── 记录测试日志
+    ↓
+生成测试报告 (HTML/JSON格式)
+    ↓
+输出测试总结
+
+6. 自动化测试框架-QT（研发）
+6.1 UDP质量测试（以C3为例）
+1. 测试目标
+通过"发包→设备回包"的闭环测试，PC端需统计以下关键指标：
+丢包率（基于seq序号缺失判断）
+RTT延迟（包括平均延迟、P95分位延迟、P99分位延迟）
+抖动（RTT值的波动情况）
+乱序（回包seq序号的顺序异常）
+采用UDP协议的优势在于：不会像TCP那样通过重传机制掩盖问题，能更直接地暴露SPI通信、驱动程序或任务调度导致的丢包问题。
+2. 测试报文格式
+设计原则
+建议采用"固定头+可变payload"的结构，使用小端模式，采用packed处理避免结构体对齐问题。
+ PC→设备（PING报文）
+// 固定头（建议 24 bytes）
+magic     = 0x55445051  // 'UDPQ'
+ver       = 1
+flags     = 0           // 预留
+seq       = 递增序号
+t_tx_us   = PC 发送时间戳(微秒)  // 用于 PC 自己算 RTT（也可以不依赖设备时钟） payload_len
+crc32     = 对 header(除crc) + payload 做 CRC32（可选但强烈建议）
+payload[] // 填充随机/固定模式
+设备→PC（回包报文）
+设备收到PING报文后：
+应原样返回seq和t_tx_us字段
+增加t_rx_us字段（设备本地接收时间戳，用于分析设备侧处理延迟）
+增加status字段（标识校验失败、长度不对等异常情况）
+关键参数建议：
+UDP端口：5001
+payload大小：先从256B开始测试，再测试1024B和1400B（1400B接近MTU，适合测试吞吐能力）
+W5500 socket buffer：为测试用socket分配8KB/16KB（缓冲区越大越不容易溢出）
+MTU限制：W5500单包UDP payload不要超过约1472B（在MTU 1500的网络环境下），否则上层会分片，增加测试复杂性
+3. PC端测试实现（Qt平台）
+Qt 端整体逻辑---UI 输入（建议）
+目标 IP、端口 （默认 5001）
+payload_len（256/1024/1400）
+发送间隔 interval_us（例如 1000us = 1kpps）
+发送总数 count（例如 20000）
+Start / Stop
+实时统计显⽰： sent/recv/loss%、avg/p95/p99/max、jitter
+核心流程
+1.  Start ：
+  创建 QUdpSocket
+  connect(readyRead, onReadyRead) 
+  启动发送器（ QTimer 或线程循环）
+2. 每次发送：
+  组包： header + payload + crc32
+  记录 seq -> t0 （高精度时间戳）
+570865113030  socket->writeDatagram(...)
+  socket->writeDatagram(...)
+
+3. 收包：
+。 解包拿到 seq
+。 找到  t0  计算 RTT
+  记录 RTT、更新统计
+4.  Stop / 跑完：
+  关闭 timer/socket
+  统计 P95/P99（把 RTT 数组排序取分位）
+  输出最终报告
+6.2 TCP吞吐测试（以C3为例）
+1. 测试用例设计
+ A. 上行吞吐（设备发→PC收）
+用途：测试W5500的发包能力、SPI写入效率以及任务调度性能
+测试流程： 
+PC端启动TCP Server（监听端口例如5002）
+设备作为TCP Client连接PC
+PC端仅负责高速recv()，累计接收字节数
+PC通过bytes / elapsed_time计算吞吐率
+ B. 下行吞吐（PC发→设备收）
+用途：测试W5500的收包能力、SPI读出效率以及应用层读取速度
+测试流程：与上行相反，PC作为Client连接设备后持续发送数据，设备持续接收并计数
+重要性：两个方向都需测试，因为很多系统存在"能收不能发"或"能发不能收"的不对称瓶颈
+2. PC端Qt实现
+2.1 A. PC作为Server（接收设备上行数据）
+使用QTcpServer::listen()监听端口
+在newConnection()信号中获取QTcpSocket*
+在readyRead()信号槽中循环调用readAll()累计接收字节
+使用QElapsedTimer计时，每1秒计算并打印一次Mbps
+2.2 B. PC作为Client（向设备发送下行数据）
+使用QTcpSocket::connectToHost()连接设备
+通过定时或while循环write()大块数据（建议16KB/64KB）
+可选使用waitForBytesWritten()确保数据发送
+同样按时间统计已发送字节数
+实现注意事项：尽量避免在readyRead()槽函数中进行繁重的UI操作，统计数值应通过信号发送给UI线程处理
+6.3判断方法
+配合 Wireshark 抓包看：
+大量TCP重传但交换机CRC错误不增长：可能是设备侧"供包/取包不及时"、SPI偶发错误或任务被抢占；
+吞吐率低但几乎无重传：可能是每次write/send数据量太小、应用层处理节拍慢或socket buffer配置过小；
+吞吐率随SPI频率提升明显增加：瓶颈在SPI总线或驱动数据搬运；
+仅在系统繁忙时吞吐下降：存在任务调度或临界区竞争问题（如UI操作、Flash读写、中断频繁时）；
+7. 专项测试场景 (型号差异化) 
+7.1 C2系列 (百兆网口) 专项：
+功耗与散热测试：在高温环境下满负荷运行，监测网络芯片温度与通信稳定性。
+IP配置兼容性测试：验证与不同品牌/型号交换机的兼容性。
+7.2 H1系列 (千兆网口) 专项
+高带宽吞吐测试：验证在千兆全双工模式下，持续输出高频率点云数据时的实际吞吐量是否接近线速，CPU占用是否合理。
+高精度时间同步测试：验证NTP同步精度，确保多雷达融合时毫秒级时间戳同步。
+固件升级压力测试：循环执行固件升级流程2000次，验证存储介质耐久性。
+IP配置兼容性测试：验证与不同品牌/型号交换机的兼容性。
+
+7.3 环境测试（适用所有雷达）
+温度循环测试：在高低温箱中进行温度循环，在温度变化过程中及稳定点测试网络连接与数据传输。
+EMC抗扰度测试：在电波暗室中，施加射频场感应的传导骚扰、静电放电等干扰，监测通信是否中断或出错。
+
+8、网络检测及数据分析
+Wireshark数据分析脚本
+9. 测试流程
+计划与设计阶段：测试负责人制定《测试计划》，明确资源、日程、风险。开发提供《通信协议规格书》。
+环境搭建阶段：硬件工程师依据清单搭建可复现的测试平台，包括硬件连接、软件安装、网络配置。
+自动化用例开发：测试开发工程师根据本方案编写和调试自动化测试脚本。
+测试执行阶段：版本发布测试：测试工程师执行全套手动与自动化测试。问题复现与定位：对失败用例进行深度分析，配合开发定位问题。
+缺陷管理：所有问题录入缺陷跟踪系统，关联测试用例，跟踪至修复并完成回归验证。
+报告与归档：测试框架自动生成报告，测试负责人审核、签字并归档所有测试记录（日志、截图、抓包文件）。
+
+9. 交付物 
+《单次版本测试报告》：包含完整测试结果、性能数据图表、与基线对比、问题摘要。
+《型号通信系统认证报告》：汇总所有测试类型的最终结论，明确C2/H1是否满足全部通信准入标准。
+自动化测试代码包：完整的、可交付的测试框架源代码、依赖清单、部署文档和使用手册。
+测试问题追踪清单：记录所有发现缺陷的状态、严重等级、根本原因及修复验证结果。
+测试环境配置手册：详细记录测试平台的硬件型号、软件版本、网络拓扑及配置参数。
+
+

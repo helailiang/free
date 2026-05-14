@@ -1,0 +1,32 @@
+{
+  "name": "H1-样机",
+  "model": "h1",
+  "host": "192.168.1.111",
+  "port": 2111,
+  "connect_timeout_s": 5.0,
+  "recv_timeout_s": 0.5,
+  "report_dir": "network_test/automation/reports_output",
+  "raw_dir": "network_test/automation/raw_output",
+  "commands": {
+    "h1_login_permission": 3,
+    "h1_login_password_hex": "F4 72 47 44",
+    "single_scan_hex": "02 02 02 02 00 09 02 30 43",
+    "start_stream_hex": "02 02 02 02 00 0A 02 31 01 46",
+    "stop_stream_hex": "02 02 02 02 00 0A 02 31 00 45"
+  },
+  "stream": {
+    "sample_cycles": 5,
+    "sample_duration_s": 10.0,
+    "expected_points_per_scan": 2701,
+    "expected_packets_per_scan": 22,
+    "scan_start_deg": -45.0,
+    "angle_resolution_deg": 0.1,
+    "expected_frame_rate_hz": 30.0
+  },
+  "thresholds": {
+    "protocol_success_rate_min_percent": 100.0,
+    "h1_recovery_timeout_s": 5.0,
+    "h1_stream_loss_rate_max_percent": 0.5,
+    "frame_rate_tolerance_percent": 10.0
+  }
+}
