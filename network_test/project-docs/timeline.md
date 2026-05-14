@@ -10,6 +10,12 @@
 - 新增 `network_test/automation` 自动化测试框架。
 - 新增 C2/H1 配置样例、通信客户端、连续取数统计、报告生成和 Pytest 用例。
 - 新增长稳 runner 和人工事件记录说明。
+- 增强长稳 runner：读取人工事件文件，汇总窗口总数、失败窗口、总帧数、解析错误、最大缺包率、最大数据间隔和恢复事件。
+- 增强报告：JSON/CSV/HTML 增加失败分类、结果计数和整轮汇总指标。
+- 新增 `network_test/automation/FIELD_VALIDATION.md`，形成现场验证闭环、执行顺序、事件记录模板和归档清单。
+- 修正 HW-03 实现偏差：新增 `network_test/automation/ping.py`，支持持续 ping、成功率、RTT 最小/平均/最大和抖动统计。
+- 配置文件改为 JSONC 注释风格，`configs/h1.example.json` 默认 H1 地址更新为 `192.168.1.86`。
+- 新增 `network_test/automation/TEST_INSTANCE_IMPLEMENTATION.md`，将测试实例实现明细、实现过程与测试说明独立成文档。
 
 后续建议：
 

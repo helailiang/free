@@ -26,6 +26,7 @@ class CaseResult:
     outcome: str
     duration_s: float
     message: str = ""
+    category: str = "general"
     metrics: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -44,11 +45,28 @@ class RunReport:
     started_at: str
     cases: list[CaseResult] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    summary: dict[str, Any] = field(default_factory=dict)
 
     @property
     def passed(self) -> bool:
         """只要存在 failed/error 即视为整轮失败，skipped 不影响硬件未连接时的离线自检。"""
         return all(case.outcome not in {"failed", "error"} for case in self.cases)
+
+    def outcome_counts(self) -> dict[str, int]:
+        """按结果汇总数量，现场人员可先看整体 PASS/FAIL 分布。"""
+        counts: dict[str, int] = {}
+        for case in self.cases:
+            counts[case.outcome] = counts.get(case.outcome, 0) + 1
+        return counts
+
+    def failure_categories(self) -> dict[str, int]:
+        """按失败分类汇总，帮助判断问题更像链路、协议、数据质量还是恢复超时。"""
+        categories: dict[str, int] = {}
+        for case in self.cases:
+            if case.outcome not in {"failed", "error"}:
+                continue
+            categories[case.category] = categories.get(case.category, 0) + 1
+        return categories
 
     def to_dict(self) -> dict[str, Any]:
         """转换为带总结果的字典结构。"""
@@ -59,6 +77,9 @@ class RunReport:
             "host": self.host,
             "started_at": self.started_at,
             "passed": self.passed,
+            "outcome_counts": self.outcome_counts(),
+            "failure_categories": self.failure_categories(),
+            "summary": self.summary,
             "notes": self.notes,
             "cases": [case.to_dict() for case in self.cases],
         }
@@ -92,7 +113,7 @@ class ReportWriter:
         with path.open("w", encoding="utf-8-sig", newline="") as f:
             writer = csv.DictWriter(
                 f,
-                fieldnames=["name", "outcome", "duration_s", "message", "metrics"],
+                fieldnames=["name", "outcome", "category", "duration_s", "message", "metrics"],
             )
             writer.writeheader()
             for case in report.cases:
@@ -100,6 +121,7 @@ class ReportWriter:
                     {
                         "name": case.name,
                         "outcome": case.outcome,
+                        "category": case.category,
                         "duration_s": round(case.duration_s, 4),
                         "message": case.message,
                         "metrics": json.dumps(case.metrics, ensure_ascii=False),
@@ -114,6 +136,7 @@ class ReportWriter:
                 "<tr>"
                 f"<td>{html.escape(case.name)}</td>"
                 f"<td>{html.escape(case.outcome)}</td>"
+                f"<td>{html.escape(case.category)}</td>"
                 f"<td>{case.duration_s:.3f}</td>"
                 f"<td>{html.escape(case.message)}</td>"
                 f"<td><pre>{html.escape(json.dumps(case.metrics, ensure_ascii=False, indent=2))}</pre></td>"
@@ -121,6 +144,9 @@ class ReportWriter:
             )
 
         notes = "".join(f"<li>{html.escape(note)}</li>" for note in report.notes)
+        summary = html.escape(json.dumps(report.summary, ensure_ascii=False, indent=2))
+        outcome_counts = html.escape(json.dumps(report.outcome_counts(), ensure_ascii=False))
+        failure_categories = html.escape(json.dumps(report.failure_categories(), ensure_ascii=False))
         body = f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -138,11 +164,15 @@ class ReportWriter:
   <h1>{html.escape(report.title)}</h1>
   <p>设备：{html.escape(report.device_name)} / {html.escape(report.model)} / {html.escape(report.host)}</p>
   <p>开始时间：{html.escape(report.started_at)}，总结果：{"PASS" if report.passed else "FAIL"}</p>
+  <p>结果计数：{outcome_counts}</p>
+  <p>失败分类：{failure_categories}</p>
+  <h2>汇总指标</h2>
+  <pre>{summary}</pre>
   <h2>备注</h2>
   <ul>{notes}</ul>
   <h2>用例结果</h2>
   <table>
-    <thead><tr><th>用例</th><th>结果</th><th>耗时(s)</th><th>信息</th><th>指标</th></tr></thead>
+    <thead><tr><th>用例</th><th>结果</th><th>分类</th><th>耗时(s)</th><th>信息</th><th>指标</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
   </table>
 </body>

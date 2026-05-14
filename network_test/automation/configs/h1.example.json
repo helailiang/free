@@ -1,32 +1,74 @@
 {
+  // name：报告中显示的设备名称，可写样机编号、固件版本或测试工位名称。
   "name": "H1-样机",
+  // model：设备型号；历史上写 h2 的配置会被程序按 h1 处理。
   "model": "h1",
-  "host": "192.168.1.111",
+  // host：H1 雷达 IP 地址；当前现场可连接的 H1 地址为 192.168.1.86。
+  "host": "192.168.1.86",
+  // port：H1E0-02A 网口 TCP 服务端口，当前协议默认 2111。
   "port": 2111,
+  // connect_timeout_s：TCP 建连和 H1 登录阶段的超时时间，单位秒。
   "connect_timeout_s": 5.0,
+  // recv_timeout_s：单次 socket 接收超时时间，单位秒；连续取数会循环接收。
   "recv_timeout_s": 0.5,
+  // report_dir：JSON/CSV/HTML 报告输出目录。
   "report_dir": "network_test/automation/reports_output",
+  // raw_dir：预留的原始数据输出目录，后续需要落盘抓取原始帧时使用。
   "raw_dir": "network_test/automation/raw_output",
+  // commands：H1 协议命令配置，依据 H1E0-02A 说明书第 4 章表 4-2。
   "commands": {
+    // h1_login_permission：H1 登录权限等级，现有脚本默认使用 3。
     "h1_login_permission": 3,
+    // h1_login_password_hex：H1 登录 4 字节密码，按 hex 文本填写。
     "h1_login_password_hex": "F4 72 47 44",
+    // single_scan_hex：H1 4.2.22 单次数据请求命令。
     "single_scan_hex": "02 02 02 02 00 09 02 30 43",
+    // start_stream_hex：H1 4.2.23 连续请求数据开命令。
     "start_stream_hex": "02 02 02 02 00 0A 02 31 01 46",
+    // stop_stream_hex：H1 4.2.23 连续请求数据关命令。
     "stop_stream_hex": "02 02 02 02 00 0A 02 31 00 45"
   },
+  // ping：HW-03 网络基础连通性测试配置，用于持续 ping 和 RTT 统计。
+  "ping": {
+    // duration_s：正式 HW-03 持续 ping 时长，604800 秒等于 7 天。
+    "duration_s": 604800.0,
+    // pytest_duration_s：Pytest 快速样本时长，避免开发回归时阻塞 7 天。
+    "pytest_duration_s": 10.0,
+    // interval_s：两次 ping 之间的间隔，单位秒。
+    "interval_s": 1.0,
+    // timeout_ms：单次 ping 应答超时，单位毫秒。
+    "timeout_ms": 1000,
+    // packet_size：ping 负载大小，单位字节。
+    "packet_size": 32
+  },
+  // stream：连续取数统计配置，用于 PROT-02、NET-01、REL-01 等用例。
   "stream": {
+    // sample_cycles：Pytest 短样本最多采集圈数。
     "sample_cycles": 5,
+    // sample_duration_s：Pytest 短样本最长采集时长，单位秒。
     "sample_duration_s": 10.0,
+    // expected_points_per_scan：每圈理论点数，270°/0.1° 常见为 2701。
     "expected_points_per_scan": 2701,
+    // expected_packets_per_scan：每圈理论包数，用于估算缺包率。
     "expected_packets_per_scan": 22,
+    // scan_start_deg：扫描起始角，H1 常见为 -45°。
     "scan_start_deg": -45.0,
+    // angle_resolution_deg：角分辨率，单位度。
     "angle_resolution_deg": 0.1,
+    // expected_frame_rate_hz：期望扫描频率，单位 Hz。
     "expected_frame_rate_hz": 30.0
   },
+  // thresholds：测试准入阈值，报告判定 PASS/FAIL 时使用。
   "thresholds": {
+    // ping_success_rate_min_percent：HW-03 ping 成功率最低要求。
+    "ping_success_rate_min_percent": 99.9,
+    // protocol_success_rate_min_percent：协议响应正确率要求。
     "protocol_success_rate_min_percent": 100.0,
+    // h1_recovery_timeout_s：H1 断线/异常后的恢复时间阈值，单位秒。
     "h1_recovery_timeout_s": 5.0,
+    // h1_stream_loss_rate_max_percent：H1 应用层缺包率上限。
     "h1_stream_loss_rate_max_percent": 0.5,
+    // frame_rate_tolerance_percent：动态场景帧率波动容差。
     "frame_rate_tolerance_percent": 10.0
   }
 }

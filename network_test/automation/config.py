@@ -2,7 +2,7 @@
 自动化测试配置读取。
 
 设计原则：
-1. 不强依赖 PyYAML 等额外库，第一版使用 Python 标准库可直接解析的 JSON。
+1. 不强依赖 PyYAML 等额外库，配置文件使用 JSONC 写法，允许 `//` 与 `/* ... */` 注释。
 2. 把 C2/H1 的网络参数、协议命令和准入阈值放入配置文件，避免现场换设备时改代码。
 3. 保留 H1/H2 命名兼容：项目历史文件里有 h2 命名，但业务上按用户确认统一视为 H1。
 """
@@ -32,6 +32,25 @@ class ThresholdConfig:
     @classmethod
     def from_dict(cls, raw: dict[str, Any] | None) -> "ThresholdConfig":
         """从配置字典构造阈值；未知字段忽略，避免后续扩展配置时破坏旧脚本。"""
+        if not raw:
+            return cls()
+        allowed = {field.name for field in cls.__dataclass_fields__.values()}
+        return cls(**{k: v for k, v in raw.items() if k in allowed})
+
+
+@dataclass(slots=True)
+class PingConfig:
+    """HW-03 持续 ping 测试配置，用于统计成功率、RTT 均值、最大值和抖动。"""
+
+    duration_s: float = 604800.0
+    pytest_duration_s: float = 10.0
+    interval_s: float = 1.0
+    timeout_ms: int = 1000
+    packet_size: int = 32
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any] | None) -> "PingConfig":
+        """读取 ping 配置；正式测试默认 7 天，Pytest 默认只跑短样本避免阻塞开发。"""
         if not raw:
             return cls()
         allowed = {field.name for field in cls.__dataclass_fields__.values()}
@@ -97,6 +116,7 @@ class DeviceConfig:
     report_dir: str = "network_test/automation/reports_output"
     raw_dir: str = "network_test/automation/raw_output"
     commands: CommandConfig = field(default_factory=CommandConfig)
+    ping: PingConfig = field(default_factory=PingConfig)
     stream: StreamConfig = field(default_factory=StreamConfig)
     thresholds: ThresholdConfig = field(default_factory=ThresholdConfig)
 
@@ -139,16 +159,60 @@ def hex_to_bytes(hex_text: str) -> bytes:
     return bytes.fromhex(cleaned)
 
 
+def strip_json_comments(text: str) -> str:
+    """
+    去除 JSONC 注释后交给标准库 `json.loads`。
+
+    这里按字符扫描而不是简单正则替换，避免把 hex 字符串或 Windows 路径中的 `//`
+    误当成注释删除。支持 `// 行注释` 与 `/* 块注释 */`。
+    """
+    out: list[str] = []
+    i = 0
+    in_string = False
+    escaped = False
+    while i < len(text):
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+        if in_string:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if ch == '"':
+            in_string = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and nxt == "/":
+            i += 2
+            while i < len(text) and text[i] not in "\r\n":
+                i += 1
+            continue
+        if ch == "/" and nxt == "*":
+            i += 2
+            while i + 1 < len(text) and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def load_device_config(path: str | Path) -> DeviceConfig:
     """
-    从 JSON 文件读取设备配置。
+    从 JSON/JSONC 文件读取设备配置。
 
     配置文件只描述一台设备，批量测试时由命令行或 CI 分多次调用，避免多个设备之间
     的失败原因互相干扰。
     """
     p = Path(path)
-    with p.open("r", encoding="utf-8") as f:
-        raw = json.load(f)
+    raw = json.loads(strip_json_comments(p.read_text(encoding="utf-8")))
 
     model = str(raw.get("model", "")).lower()
     if model == "h2":
@@ -166,6 +230,7 @@ def load_device_config(path: str | Path) -> DeviceConfig:
         report_dir=str(raw.get("report_dir", "network_test/automation/reports_output")),
         raw_dir=str(raw.get("raw_dir", "network_test/automation/raw_output")),
         commands=CommandConfig.from_dict(raw.get("commands")),
+        ping=PingConfig.from_dict(raw.get("ping")),
         stream=StreamConfig.from_dict(raw.get("stream")),
         thresholds=ThresholdConfig.from_dict(raw.get("thresholds")),
     )

@@ -1,9 +1,11 @@
 """
 基础连通性测试。
 
-该文件覆盖测试方案中的 HW-03：先验证 TCP 端口可达，再由各型号客户端完成必要的
-登录或会话初始化。Ping 因 Windows/Linux 输出格式差异较大，第一版先以 TCP 可达作为
-自动化准入，Ping 可在长稳阶段作为人工环境记录补充。
+该文件覆盖两层连通性：
+1. HW-03 的 ping/RTT 短样本统计，用于快速确认成功率和 RTT 字段可采集。
+2. TCP 端口与 H1 登录，用于后续协议和取数用例的前置确认。
+
+正式 HW-03 仍应通过 runner 的 `--mode ping --duration-s 604800` 执行 7 天测试。
 """
 
 from __future__ import annotations
@@ -13,8 +15,26 @@ import time
 import pytest
 
 from network_test.automation.clients.base import RadarClientError
+from network_test.automation.ping import run_ping_test
 
 from .conftest import attach_metrics
+
+
+@pytest.mark.integration
+def test_hw03_ping_rtt_sample(radar_config, request: pytest.FixtureRequest) -> None:
+    """执行 HW-03 ping 短样本，统计成功率、平均 RTT、最大 RTT 和抖动。"""
+    stats = run_ping_test(radar_config, duration_s=float(radar_config.ping.pytest_duration_s))
+    metrics = stats.to_dict()
+    attach_metrics(request.node, metrics)
+
+    assert stats.sent > 0, "未发送任何 ping 包"
+    assert stats.received > 0, "未收到任何 ping 应答"
+    assert stats.success_rate_percent >= radar_config.thresholds.ping_success_rate_min_percent, (
+        f"ping 成功率 {stats.success_rate_percent}% 低于阈值 "
+        f"{radar_config.thresholds.ping_success_rate_min_percent}%"
+    )
+    assert stats.rtt_avg_ms is not None, "未统计到平均 RTT"
+    assert stats.rtt_avg_ms < 2.0, f"平均 RTT {stats.rtt_avg_ms}ms 不满足局域网 <2ms 建议标准"
 
 
 @pytest.mark.integration

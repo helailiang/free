@@ -1,30 +1,70 @@
 {
+  // name：报告中显示的设备名称，可写样机编号、固件版本或测试工位名称。
   "name": "C2-样机",
+  // model：设备型号；C2 使用现有 C200 压力测试脚本中的命令作为第一版依据。
   "model": "c2",
+  // host：C2 雷达 IP 地址，现场测试前需要改成真实设备地址。
   "host": "192.168.10.7",
+  // port：C2 TCP 服务端口，现有脚本默认使用 2111。
   "port": 2111,
+  // connect_timeout_s：TCP 建连超时时间，单位秒。
   "connect_timeout_s": 5.0,
+  // recv_timeout_s：单次 socket 接收超时时间，单位秒；连续取数会循环接收。
   "recv_timeout_s": 0.5,
+  // report_dir：JSON/CSV/HTML 报告输出目录。
   "report_dir": "network_test/automation/reports_output",
+  // raw_dir：预留的原始数据输出目录，后续需要落盘抓取原始帧时使用。
   "raw_dir": "network_test/automation/raw_output",
+  // commands：C2 协议命令配置，第一版复用 C200 压力测试脚本中已验证命令。
   "commands": {
+    // start_stream_hex：C2 连续取数启动命令。
     "start_stream_hex": "02 02 02 02 00 0A 02 31 01 46",
+    // stop_stream_hex：C2 连续取数停止命令。
     "stop_stream_hex": "02 02 02 02 00 0A 02 31 00 45",
+    // c2_query_config_hex：C2 扫描配置查询命令。
     "c2_query_config_hex": "02 02 02 02 00 09 00 1A 2B"
   },
+  // ping：HW-03 网络基础连通性测试配置，用于持续 ping 和 RTT 统计。
+  "ping": {
+    // duration_s：正式 HW-03 持续 ping 时长，604800 秒等于 7 天。
+    "duration_s": 604800.0,
+    // pytest_duration_s：Pytest 快速样本时长，避免开发回归时阻塞 7 天。
+    "pytest_duration_s": 10.0,
+    // interval_s：两次 ping 之间的间隔，单位秒。
+    "interval_s": 1.0,
+    // timeout_ms：单次 ping 应答超时，单位毫秒。
+    "timeout_ms": 1000,
+    // packet_size：ping 负载大小，单位字节。
+    "packet_size": 32
+  },
+  // stream：连续取数统计配置，用于 PROT-02、NET-01、REL-01 等用例。
   "stream": {
+    // sample_cycles：Pytest 短样本最多采集圈数。
     "sample_cycles": 5,
+    // sample_duration_s：Pytest 短样本最长采集时长，单位秒。
     "sample_duration_s": 10.0,
+    // expected_points_per_scan：每圈理论点数，270°/0.1° 常见为 2701。
     "expected_points_per_scan": 2701,
+    // expected_packets_per_scan：每圈理论包数，用于估算缺包率。
     "expected_packets_per_scan": 22,
+    // scan_start_deg：扫描起始角；如 C2 固件定义不同，应按正式协议修正。
     "scan_start_deg": -45.0,
+    // angle_resolution_deg：角分辨率，单位度。
     "angle_resolution_deg": 0.1,
+    // expected_frame_rate_hz：期望扫描频率，单位 Hz。
     "expected_frame_rate_hz": 30.0
   },
+  // thresholds：测试准入阈值，报告判定 PASS/FAIL 时使用。
   "thresholds": {
+    // ping_success_rate_min_percent：HW-03 ping 成功率最低要求。
+    "ping_success_rate_min_percent": 99.9,
+    // protocol_success_rate_min_percent：协议响应正确率要求。
     "protocol_success_rate_min_percent": 100.0,
+    // c2_recovery_timeout_s：C2 断线/异常后的恢复时间阈值，单位秒。
     "c2_recovery_timeout_s": 10.0,
+    // stream_loss_rate_max_percent：C2 应用层缺包率上限。
     "stream_loss_rate_max_percent": 1.0,
+    // frame_rate_tolerance_percent：动态场景帧率波动容差。
     "frame_rate_tolerance_percent": 10.0
   }
 }
