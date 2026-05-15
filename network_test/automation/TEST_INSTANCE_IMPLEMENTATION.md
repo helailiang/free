@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | HW-03 持续 ping 与 RTT 统计 | HW-03 | `network_test/automation/ping.py`、`network_test/automation/tests/test_connectivity.py`、`network_test/automation/runner.py` | 全自动 | 统计发送数、接收数、成功率、RTT 最小/平均/最大和抖动 |
 | TCP 连接与 H1 登录 | PROT-02 | `network_test/automation/tests/test_connectivity.py` | 全自动 | TCP 能连接；H1 能完成登录；连接耗时记录到报告 |
-| 基础协议查询 | PROT-02 | `network_test/automation/tests/test_protocol.py` | 全自动 | C2 配置查询或 H1 单次数据请求有非空应答 |
+| 基础协议查询 | PROT-01/02 | `network_test/automation/tests/test_protocol.py`、`clients/h1_client.py` | 全自动 | C2：0x1A 配置读有应答；H1：读 IP/网关/掩码/转速角分辨率并可解析 |
 | 连续取数质量统计 | PROT-02、NET-01、REL-01 | `network_test/automation/tests/test_stream.py` | 全自动 | 能收到数据帧；解析错误为 0；缺包率不超过配置阈值 |
 | 应用层主动重连 | NET-02 | `network_test/automation/tests/test_recovery.py` | 全自动 | 主动断开后重新连接耗时不超过 C2 10 秒、H1 5 秒 |
 | 长稳窗口测试 | REL-01、NET-02、SYS-01 | `network_test/automation/runner.py` | 半自动 | 每个窗口输出帧数、圈数、缺包率、最大数据间隔和失败原因 |
@@ -145,9 +145,9 @@ uv run pytest network_test/automation/tests/test_connectivity.py --radar-config 
 **简单实现过程：**
 
 1. C2 发送配置查询命令 `02 02 02 02 00 09 00 1A 2B`。
-2. H1 完成登录后发送单次数据请求 `02 02 02 02 00 09 02 30 43`。
-3. 读取设备返回的原始字节。
-4. 把应答长度和前 64 字节 Hex 前缀写入报告，便于现场人员和协议人员复核。
+2. H1 登录后依次读 IP（0x10）、网关（0x12）、子网掩码（0x14）、转速/角分辨率（0x1A），见 `clients/h1_client.py`。
+3. 原始应答在 `clients/h1_param_parse.py` 中按表 4-2 应答操作码 `0x12` 切帧并解析。
+4. 报告写入 `ip`、`gateway`、`subnet_mask`、`spin_hz`、`angle_resolution_deg` 及 `raw_lengths`。
 
 **如何测试：**
 
@@ -158,8 +158,10 @@ uv run pytest network_test/automation/tests/test_protocol.py --radar-config netw
 
 **通过条件：**
 
-- 协议查询有非空应答。
-- 若无应答，需要检查 IP、端口、雷达是否已上电、网段是否一致、H1 登录密码是否正确。
+- C2：配置读有非空应答。
+- H1：至少一条读命令有原始应答，且至少解析出一项（如 IP 或角分辨率）。
+- 点云活性（4.2.22）单独用 `H1RadarClient.probe_protocol()`，不替代参数读。
+- 若无应答，检查 IP、端口、上电、网段、H1 登录密码。
 
 ## 6. 测试实例四：连续取数质量统计
 
@@ -270,3 +272,74 @@ uv run python -m network_test.automation.runner --config network_test/automation
 7. 最后再执行 7 天 ping，以及 8 小时、24 小时、72 小时长稳。
 
 高风险测试（协议模糊测试、广播风暴、固件升级压力循环）不建议直接在量产样机或客户现场执行，应先在可恢复的实验设备上验证。
+
+## 11. 如何添加新的 H1 指令测试
+
+后续要在自动化里增加「读/写某参数」或新冒烟项，按下面四步做即可（不必改 runner 核心逻辑）。
+
+### 步骤 1：在配置文件增加命令 Hex
+
+编辑 `network_test/automation/configs/h1.example.json` 的 `commands` 段，增加字段，例如：
+
+```json
+"read_version_hex": "02 02 02 02 00 09 02 0C 1F"
+```
+
+同时在 `network_test/automation/config.py` 的 `CommandConfig` 里增加同名默认值（否则 `from_dict` 会忽略未知键）。Hex 来源：说明书 4.2.x 或现场工具（如 `c2_h1/C225指令测试.py`）。
+
+### 步骤 2：在客户端封装发送（可选）
+
+- **只测「有应答」**：在测试里直接  
+  `radar_client.read_parameter("read_version_hex")`  
+  （`H1RadarClient` 已提供，需先 `connect()` 完成登录）。
+- **需要专用方法**：在 `h1_client.py` 增加  
+  `def read_version(self) -> bytes: return self.read_parameter("read_version_hex")`  
+  无参数读也可用 `build_h1_read_frame(0x0C)` 组帧，但推荐配置化以便现场改 Hex 不重打包。
+
+写命令（操作码 `0x01`）需按说明书拼参数并用 `checksum8` 算校验和，可参考 C225 的 `set_ip` / `set_freq`；建议单独 `build_h1_write_frame` 或配置完整写帧 Hex。
+
+### 步骤 3：解析应答（需要断言数值时）
+
+在 `clients/h1_param_parse.py` 增加解析函数，例如：
+
+```python
+def parse_version_string(raw: bytes) -> str | None:
+    frame = find_reply_frame(raw, 0x0C)
+    ...
+```
+
+若多条读命令要一起上报，可扩展 `H1NetworkParams` 字段，或在 `read_network_params()` 里追加调用。
+
+### 步骤 4：增加 Pytest 用例
+
+在 `tests/` 下新建或扩展 `test_protocol.py`，例如：
+
+```python
+@pytest.mark.integration
+def test_h1_read_version(radar_client, radar_config):
+    if radar_config.normalized_model != "h1":
+        pytest.skip("仅 H1")
+    radar_client.connect()
+    raw = radar_client.read_parameter("read_version_hex")
+    assert raw
+```
+
+用 `attach_metrics(request.node, {...})` 把解析结果写入 JSON 报告。运行：
+
+```bash
+uv run pytest network_test/automation/tests/test_protocol.py -k version --radar-config network_test/automation/configs/h1.example.json
+```
+
+### 冒烟 runner 是否自动包含？
+
+`runner --mode smoke` 的 `protocol_query` 步骤目前只调用 `read_network_params()`。新指令若需进冒烟，在 `read_network_params()` 中增加读取与解析，或单独加 `runner` 的 case 名称。
+
+### 相关文件速查
+
+| 文件 | 作用 |
+|---|---|
+| `config.py` / `configs/h1.example.json` | 命令 Hex 与阈值 |
+| `clients/h1_client.py` | 登录、发读命令、`read_network_params()` |
+| `clients/h1_param_parse.py` | 应答切帧与字段解析 |
+| `tests/test_protocol.py` | PROT 类 Pytest 用例 |
+| `runner.py` | 现场一键冒烟 |

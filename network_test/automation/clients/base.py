@@ -148,7 +148,7 @@ class BaseRadarClient(ABC):
                 scan_id=int(parsed["scan_cnt"]),
                 packet_id=int(parsed["seq_num"]),
                 point_count=int(parsed["point_count"]),
-                timestamp=int(parsed.get("timestamp") or 0),
+                timestamp=(parsed.get("timestamp") or 0),
                 raw_length=len(frame),
                 parse_source="h1_text_frame",
             )
@@ -172,8 +172,8 @@ class BaseRadarClient(ABC):
         """
         读取连续数据流并返回统计结果。
 
-        `max_cycles` 用于现场短测，比如只收 5 圈验证协议；`duration_s` 用于长稳窗口。
-        两者同时存在时，先达到任一条件即停止，避免测试被异常设备无限阻塞。
+        `max_cycles` 表示收满多少「完整圈」（每圈 expected_packets_per_scan 个包号齐全），
+        不是见到多少个不同圈号就停。`duration_s` 用于长稳窗口；二者先达到任一条件即停止。
         """
         if self.sock is None:
             raise RadarClientError("雷达未连接，不能读取数据流")
@@ -184,12 +184,12 @@ class BaseRadarClient(ABC):
             expected_packets_per_scan=int(self.config.stream.expected_packets_per_scan),
         )
         deadline = time.monotonic() + max(0.1, float(duration_s))
-        seen_scans: set[int] = set()
         frame_index = 0
         self.sock.settimeout(float(self.config.recv_timeout_s))
+        stop_after_cycles = False
 
         while time.monotonic() < deadline:
-            if max_cycles is not None and len(seen_scans) >= int(max_cycles):
+            if stop_after_cycles:
                 break
             try:
                 chunk = self.sock.recv(65536)
@@ -210,7 +210,9 @@ class BaseRadarClient(ABC):
                     metrics.add_parse_error(f"无法解析帧，长度={len(frame)}")
                     continue
                 metrics.add_packet(packet)
-                seen_scans.add(packet.scan_id)
+                if max_cycles is not None and metrics.completed_scan_count() >= int(max_cycles):
+                    stop_after_cycles = True
+                    break
 
         return metrics.finish()
 

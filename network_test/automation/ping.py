@@ -43,21 +43,37 @@ PING_METRIC_EXPLANATIONS: dict[str, str] = {
 class PingStats:
     """一次 HW-03 ping 测试的统计结果。"""
 
+    # 被测设备 IP；与配置 host 一致，报告里用于核对是否 ping 错目标。
     host: str
+    # 计划跑满的总时长（秒）；短测用 pytest_duration_s，正式 HW-03 常用 604800（7 天）。
     planned_duration_s: float
+    # 两次 ping 之间的间隔（秒）；越小采样越密，对网络和本机负载越高。
     interval_s: float
+    # 单次 ping 等待应答的超时（毫秒）；超时应答记为丢包，与系统 ping -w 对齐。
     timeout_ms: int
+    # ICMP 负载字节数；与系统 ping -l/-s 对齐，用于固定包长便于对比不同环境。
     packet_size: int
+    # 已发出的 ping 次数（每轮循环 +1）；分母，用于算成功率。
     sent: int = 0
+    # 已从 ping 输出解析到 RTT 的次数；有 RTT 视为收到应答，分子近似为 received。
     received: int = 0
+    # 丢包数 = sent - received；排查链路时先看 lost 是否随交换机/网线动作上升。
     lost: int = 0
+    # 成功率（%）= received / sent * 100；与 thresholds.ping_success_rate_min_percent 比对。
     success_rate_percent: float = 0.0
+    # 本次所有成功样本中的最小 RTT（毫秒）；反映最好情况下的往返延迟。
     rtt_min_ms: float | None = None
+    # 平均 RTT（毫秒）；局域网准入常看此项是否长期 <2ms。
     rtt_avg_ms: float | None = None
+    # 最大 RTT（毫秒）；偶发尖峰、排队或 WiFi 抖动会拉高此项。
     rtt_max_ms: float | None = None
+    # 相邻两次 RTT 差值绝对值的平均（毫秒）；越大说明延迟波动越大，非 ICMP 协议抖动。
     jitter_ms: float | None = None
+    # 统计开始时刻：time.monotonic() 秒值，仅用于算墙钟无关的耗时差，不是日期时间。
     started_at_s: float = field(default_factory=time.monotonic)
+    # 统计结束时刻：同上；ended_at_s - started_at_s ≈ 实际占用时长（含 sleep 与 ping 耗时）。
     ended_at_s: float = field(default_factory=time.monotonic)
+    # 调系统 ping 子进程异常时的错误信息列表；空表示子进程调用层面无异常（仍可能有丢包）。
     errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:

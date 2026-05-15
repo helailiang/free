@@ -93,6 +93,11 @@ class CommandConfig:
     start_stream_hex: str = "02 02 02 02 00 0A 02 31 01 46"
     stop_stream_hex: str = "02 02 02 02 00 0A 02 31 00 45"
     c2_query_config_hex: str = "02 02 02 02 00 09 00 1A 2B"
+    # H1 参数读（现场 C225 脚本；与 c2_query_config_hex 中 0x1A 读转速/角分辨率相同）
+    read_ip_hex: str = "02 02 02 02 00 09 00 10 21"
+    read_gateway_hex: str = "02 02 02 02 00 09 00 12 23"
+    read_subnet_mask_hex: str = "02 02 02 02 00 09 00 14 25"
+    read_freq_resolution_hex: str = "02 02 02 02 00 09 00 1A 2B"
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any] | None) -> "CommandConfig":

@@ -33,6 +33,13 @@ def test_stream_sample_quality(radar_client, radar_config, request: pytest.Fixtu
 
     assert stats.frames_received > 0, "未收到连续取数数据帧"
     assert stats.parse_errors == 0, f"存在 {stats.parse_errors} 个解析失败帧"
+    assert stats.completed_scans >= min(
+        int(radar_config.stream.sample_cycles),
+        stats.scans_seen,
+    ), (
+        f"未收满配置的 {radar_config.stream.sample_cycles} 圈完整数据"
+        f"（completed_scans={stats.completed_scans}）"
+    )
     assert stats.loss_rate_percent <= radar_config.stream_loss_limit_percent, (
         f"缺包率 {stats.loss_rate_percent}% 超过阈值 {radar_config.stream_loss_limit_percent}%"
     )

@@ -26,7 +26,15 @@
     // start_stream_hex：H1 4.2.23 连续请求数据开命令。
     "start_stream_hex": "02 02 02 02 00 0A 02 31 01 46",
     // stop_stream_hex：H1 4.2.23 连续请求数据关命令。
-    "stop_stream_hex": "02 02 02 02 00 0A 02 31 00 45"
+    "stop_stream_hex": "02 02 02 02 00 0A 02 31 00 45",
+    // read_ip_hex：读设备 IP（指令 0x10），依据 C225 现场命令。
+    "read_ip_hex": "02 02 02 02 00 09 00 10 21",
+    // read_gateway_hex：读网关（指令 0x12）。
+    "read_gateway_hex": "02 02 02 02 00 09 00 12 23",
+    // read_subnet_mask_hex：读子网掩码（指令 0x14）。
+    "read_subnet_mask_hex": "02 02 02 02 00 09 00 14 25",
+    // read_freq_resolution_hex：读转速(Hz×100)与角分辨率(°×10000)，指令 0x1A。
+    "read_freq_resolution_hex": "02 02 02 02 00 09 00 1A 2B"
   },
   // ping：HW-03 网络基础连通性测试配置，用于持续 ping 和 RTT 统计。
   "ping": {
@@ -43,7 +51,7 @@
   },
   // stream：连续取数统计配置，用于 PROT-02、NET-01、REL-01 等用例。
   "stream": {
-    // sample_cycles：Pytest 短样本最多采集圈数。
+    // sample_cycles：Pytest 短样本收满多少「完整圈」（每圈 22 包齐全）后停止，不是见到第 N 圈首包就停。
     "sample_cycles": 5,
     // sample_duration_s：Pytest 短样本最长采集时长，单位秒。
     "sample_duration_s": 10.0,
@@ -60,9 +68,9 @@
   },
   // thresholds：测试准入阈值，报告判定 PASS/FAIL 时使用。
   "thresholds": {
-    // ping_success_rate_min_percent：HW-03 ping 成功率最低要求。
+    // ping_success_rate_min_percent：HW-03 ping 成功率最低要求。%
     "ping_success_rate_min_percent": 99.9,
-    // protocol_success_rate_min_percent：协议响应正确率要求。
+    // protocol_success_rate_min_percent：协议响应正确率要求。%
     "protocol_success_rate_min_percent": 100.0,
     // h1_recovery_timeout_s：H1 断线/异常后的恢复时间阈值，单位秒。
     "h1_recovery_timeout_s": 5.0,

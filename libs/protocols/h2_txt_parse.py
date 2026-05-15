@@ -64,10 +64,15 @@ def h2_point_index_to_angle_deg(
     return scan_start_deg + float(point_index) * angle_resolution_deg
 
 
-def _parse_h2_timestamp_10b(payload_tail: bytes) -> int:
+def _parse_h2_timestamp_10b(payload_tail: bytes) -> float:
+
     if len(payload_tail) < 10:
         return 0
-    return int.from_bytes(payload_tail[:10], byteorder="big", signed=False)
+    current_seconds = int.from_bytes(payload_tail[-9:-5], byteorder='big')
+    current_nanoseconds = int.from_bytes(payload_tail[-5:-1], byteorder='big')
+    current_timestamp = current_seconds + current_nanoseconds / (2 ** 32)
+    # print(current_seconds, current_nanoseconds , current_timestamp)
+    return  current_timestamp
 
 
 def parse_h2_pointcloud_frame(
@@ -89,24 +94,36 @@ def parse_h2_pointcloud_frame(
         return None
 
     length = u16_be(frame, 4)
+
     if length != len(frame):
         return None
 
     if verify_checksum and (sum(frame[:-1]) & 0xFF) != frame[-1]:
         return None
-
     op = frame[6]
     cmd = frame[7]
     if op != H2_OP_REPLY or cmd not in (H2_CMD_SINGLE_SCAN_DATA, H2_CMD_CONTINUOUS_SCAN_DATA):
         return None
 
+    # 设备状态：
+    # 忙碌：00
+    # 参数1
+    # 就绪：01
+    # 错误：02
     status = frame[8]
+    #扫描次数
     scan_cnt = u16_be(frame, 9)
     packet_num = frame[11]
+    # print(f"圈号: {scan_cnt}, 包号：{packet_num}, len:{length}")
+    # 扫描频率*100
     freq_x100 = u16_be(frame, 12)
+    #角分辨率 * 10000
     angle_res_x10000 = u16_be(frame, 14)
+    #一帧数据点云数
     points_per_circle = u16_be(frame, 16)
+    # 当前包首个点索引
     first_point_index = u16_be(frame, 18)
+    # 包内点数
     n_in_packet = u16_be(frame, 20)
 
     angle_resolution_deg = angle_res_x10000 / 10000.0

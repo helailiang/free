@@ -11,6 +11,7 @@ from network_test.automation.config import DeviceConfig
 from .base import BaseRadarClient
 from .c2_client import C2RadarClient
 from .h1_client import H1RadarClient
+from .h1_param_parse import H1NetworkParams
 
 
 def create_radar_client(config: DeviceConfig) -> BaseRadarClient:
@@ -20,4 +21,10 @@ def create_radar_client(config: DeviceConfig) -> BaseRadarClient:
     return C2RadarClient(config)
 
 
-__all__ = ["BaseRadarClient", "C2RadarClient", "H1RadarClient", "create_radar_client"]
+__all__ = [
+    "BaseRadarClient",
+    "C2RadarClient",
+    "H1RadarClient",
+    "H1NetworkParams",
+    "create_radar_client",
+]

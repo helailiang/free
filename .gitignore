@@ -17,3 +17,7 @@ c2_h1/标定取数/.build_venv
 c2_h1/标定取数/build
 c2_h1/标定取数/dist
 c2_h1/标定取数/h1_calib_captures
+*.spec
+__pycache__/
+**/build/
+**/dist/

@@ -147,14 +147,27 @@ def run_smoke(config: DeviceConfig) -> RunReport:
 
     started = time.monotonic()
     try:
-        reply = client.query_config()
+        if config.normalized_model == "h1":
+            from network_test.automation.clients.h1_client import H1RadarClient
+
+            assert isinstance(client, H1RadarClient)
+            params = client.read_network_params()
+            ok = params.has_any_reply() and params.has_parsed_value()
+            proto_metrics: dict[str, object] = params.to_dict()
+        else:
+            reply = client.query_config()
+            ok = bool(reply)
+            proto_metrics = {
+                "reply_bytes": len(reply),
+                "reply_hex_prefix": reply[:32].hex(" ").upper(),
+            }
         report.cases.append(
             _case_result(
                 "protocol_query",
-                "passed" if reply else "failed",
+                "passed" if ok else "failed",
                 started,
-                "收到协议应答" if reply else "协议查询无应答",
-                {"reply_bytes": len(reply), "reply_hex_prefix": reply[:32].hex(" ").upper()},
+                "收到并可解析参数读应答" if ok else "协议查询无应答或解析失败",
+                proto_metrics,
                 category="protocol",
             )
         )
@@ -355,7 +368,35 @@ def run_stability(config: DeviceConfig, *, duration_s: float, window_s: float, e
 
 
 def run_pytest(config_path: Path, report_dir: Path) -> int:
-    """通过子进程启动 Pytest，保证命令行 runner 和直接 pytest 使用同一套用例。"""
+    """
+    通过子进程启动 Pytest，保证命令行 runner 和直接 pytest 使用同一套用例。
+
+    PyInstaller 冻结后 `sys.executable` 指向 exe，无法再用「子进程执行 -m pytest」
+    复用同一解释器；因此在 `sys.frozen` 为真时改为进程内 `pytest.main`，测试目录
+    需由打包 spec 的 datas 放到 `network_test/automation/tests`（与源码相对路径一致）。
+    """
+    if getattr(sys, "frozen", False):
+        import pytest
+
+        # onefile/onedir 下 PyInstaller 均会设置 _MEIPASS 为资源根目录（含打入的 datas）
+        bundle_root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+        test_dir = bundle_root / "network_test" / "automation" / "tests"
+        if not test_dir.is_dir():
+            print(
+                "错误：当前 exe 未打包 Pytest 用例目录，无法使用 --mode pytest。",
+                file=sys.stderr,
+            )
+            return 2
+        return pytest.main(
+            [
+                str(test_dir),
+                "--radar-config",
+                str(config_path),
+                "--radar-report-dir",
+                str(report_dir),
+            ]
+        )
+
     cmd = [
         sys.executable,
         "-m",
@@ -402,7 +443,7 @@ def main(argv: list[str] | None = None) -> int:
             event_log=args.event_log,
         )
     else:
-        report = run_smoke(config)
+        report = run_smoke(config)  
 
     paths = ReportWriter(report_dir).write_all(report, prefix=args.mode)
     for kind, path in paths.items():
