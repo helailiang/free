@@ -52,6 +52,10 @@ class StreamStats:
     scans_seen: int
     # 包号齐全、无缺包的完整圈数；需配置 expected_packets_per_scan > 0 才有意义。
     completed_scans: int
+    # 参与缺包率统计的圈数；窗口首尾被截断的不完整圈不计入。
+    loss_evaluated_scans: int
+    # 因采样窗口边界截断而跳过缺包率统计的不完整圈数。
+    boundary_partial_scans_ignored: int
     # 各帧 point_count 之和；粗看点云吞吐，不替代点数正确性校验。
     points_received: int
     # 无法按协议解析的帧次数；>0 时优先查粘包、校验或固件版本。
@@ -139,6 +143,32 @@ class StreamMetrics:
         need = self.expected_packets_per_scan
         return sum(1 for packets in self._scan_packets.values() if len(packets) >= need)
 
+    def _loss_evaluation_scan_items(self) -> list[tuple[int, set[int]]]:
+        """
+        返回可用于缺包率统计的圈。
+
+        按时间截断采样时，窗口首圈或末圈可能天然不完整，不能和中间圈的真实缺包混为一谈。
+        Python dict 保留插入顺序，这里用“首次观察到的圈”和“最后观察到的圈”识别窗口边界。
+        """
+        scan_items = list(self._scan_packets.items())
+        if self.expected_packets_per_scan <= 0 or not scan_items:
+            return scan_items
+
+        need = self.expected_packets_per_scan
+        boundary_scan_ids: set[int] = set()
+        first_scan_id, first_packets = scan_items[0]
+        last_scan_id, last_packets = scan_items[-1]
+        if len(first_packets) < need:
+            boundary_scan_ids.add(first_scan_id)
+        if len(last_packets) < need:
+            boundary_scan_ids.add(last_scan_id)
+
+        return [
+            (scan_id, packets)
+            for scan_id, packets in scan_items
+            if scan_id not in boundary_scan_ids
+        ]
+
     def finish(self) -> StreamStats:
         """计算最终统计值，所有除法都做空数据保护，避免设备未连接时二次报错。"""
         now = time.monotonic()
@@ -149,13 +179,16 @@ class StreamMetrics:
         completed_scans = 0
         missing_packets = 0
         expected_packets = 0
+        loss_evaluation_scan_items = self._loss_evaluation_scan_items()
+        boundary_partial_scans_ignored = scans_seen - len(loss_evaluation_scan_items)
         if self.expected_packets_per_scan > 0:
             for packets in self._scan_packets.values():
-                expected_packets += self.expected_packets_per_scan
                 missing = max(0, self.expected_packets_per_scan - len(packets))
-                missing_packets += missing
                 if missing == 0:
                     completed_scans += 1
+            for _, packets in loss_evaluation_scan_items:
+                expected_packets += self.expected_packets_per_scan
+                missing_packets += max(0, self.expected_packets_per_scan - len(packets))
 
         if expected_packets > 0:
             loss_rate_percent = missing_packets / expected_packets * 100.0
@@ -168,6 +201,11 @@ class StreamMetrics:
             if math.isfinite(b - a) and b >= a
         ]
         max_gap = max(gaps) if gaps else 0.0
+        notes = self.notes[:]
+        if boundary_partial_scans_ignored:
+            notes.append(
+                f"缺包率统计已忽略 {boundary_partial_scans_ignored} 个窗口边界不完整圈"
+            )
 
         return StreamStats(
             model=self.model,
@@ -177,6 +215,8 @@ class StreamMetrics:
             frames_received=self.frames_received,
             scans_seen=scans_seen,
             completed_scans=completed_scans,
+            loss_evaluated_scans=len(loss_evaluation_scan_items),
+            boundary_partial_scans_ignored=boundary_partial_scans_ignored,
             points_received=self.points_received,
             parse_errors=self.parse_errors,
             duplicate_packets=self.duplicate_packets,
@@ -187,5 +227,5 @@ class StreamMetrics:
             max_inter_frame_gap_s=round(max_gap, 4),
             reconnect_count=self.reconnect_count,
             longest_data_gap_s=round(max_gap, 4),
-            notes=self.notes[:],
+            notes=notes,
         )
