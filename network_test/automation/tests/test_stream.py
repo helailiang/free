@@ -26,6 +26,16 @@ STREAM_SAMPLE_METRIC_EXPLANATIONS: dict[str, str] = {
     "completed_scans": "包号齐全（每圈收满 expected_packets_per_scan）的完整圈数。",
     "loss_evaluated_scans": "参与缺包率统计的圈数；窗口首尾被时间截断的不完整圈会跳过。",
     "boundary_partial_scans_ignored": "因采样窗口边界截断而未纳入缺包率统计的不完整圈数。",
+    "scan_timestamp_interval_count": "通过完整圈内设备时间戳计算出的相邻完整圈间隔数量。",
+    "scan_timestamp_interval_avg_s": "通过设备时间戳计算出的平均相邻完整圈间隔，单位秒。",
+    "scan_timestamp_interval_latest_s": "通过设备时间戳计算出的最近两完整圈间隔，单位秒。",
+    "scan_timestamp_interval_avg_display": "设备时间戳平均圈间隔的显示值；小于 1 秒自动显示为 ms。",
+    "scan_timestamp_interval_latest_display": "设备时间戳最近圈间隔的显示值；小于 1 秒自动显示为 ms。",
+    "completed_scan_wall_interval_count": "通过本机墙钟“完整圈收齐时刻”计算出的相邻完整圈间隔数量。",
+    "completed_scan_wall_interval_avg_s": "本机墙钟完整圈平均间隔，单位秒。",
+    "completed_scan_wall_interval_latest_s": "本机墙钟最近两完整圈间隔，单位秒。",
+    "completed_scan_wall_interval_avg_display": "本机墙钟完整圈平均间隔的显示值；小于 1 秒自动显示为 ms。",
+    "completed_scan_wall_interval_latest_display": "本机墙钟最近圈间隔的显示值；小于 1 秒自动显示为 ms。",
     "points_received": "各帧点数之和，粗看吞吐；不单独校验每点正确性。",
     "parse_errors": "无法按协议解析的帧数；>0 时查粘包/校验/固件。",
     "duplicate_packets": "同一 (圈号, 包号) 重复到达次数。",
@@ -37,6 +47,9 @@ STREAM_SAMPLE_METRIC_EXPLANATIONS: dict[str, str] = {
     "reconnect_count": "本窗口内记录的重连次数（本短测通常为 0）。",
     "longest_data_gap_s": "与 max_inter_frame_gap_s 同源，报告字段兼容用。",
     "notes": "附加说明字符串列表。",
+    "raw_capture_path": "原始帧 JSONL 落盘路径；未开启抓取时为空。",
+    "raw_frames_captured": "实际写入原始帧文件的帧数。",
+    "raw_capture_truncated": "原始帧抓取是否因 raw_capture_max_frames 上限而截断。",
     "stream_loss_limit_percent_applied": "本用例实际使用的缺包率准入阈值（%），来自配置 thresholds。",
     "sample_cycles_applied": "本测传入 read_stream_stats 的 max_cycles：收满多少完整圈后停止。",
     "sample_duration_s_applied": "本测采样时长上限（秒）；与 sample_cycles 先满足其一即停止收数。",
@@ -160,6 +173,8 @@ def test_stream_sample_quality(radar_client, radar_config, request: pytest.Fixtu
         stats = radar_client.read_stream_stats(
             duration_s=float(radar_config.stream.sample_duration_s),
             max_cycles=int(radar_config.stream.sample_cycles),
+            raw_output_dir=radar_config.raw_dir if radar_config.stream.raw_capture_enabled else None,
+            raw_capture_max_frames=int(radar_config.stream.raw_capture_max_frames),
         )
         radar_client.stop_streaming()
     except RadarClientError as exc:

@@ -68,6 +68,8 @@ class StreamConfig:
     scan_start_deg: float = -45.0
     angle_resolution_deg: float = 0.1
     expected_frame_rate_hz: float = 30.0
+    raw_capture_enabled: bool = False
+    raw_capture_max_frames: int = 10000
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any] | None) -> "StreamConfig":

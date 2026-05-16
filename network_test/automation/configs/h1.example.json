@@ -64,7 +64,11 @@
     // angle_resolution_deg：角分辨率，单位度。
     "angle_resolution_deg": 0.1,
     // expected_frame_rate_hz：期望扫描频率，单位 Hz。
-    "expected_frame_rate_hz": 15.0
+    "expected_frame_rate_hz": 15.0,
+    // raw_capture_enabled：是否把 test_stream.py/runner 连续取数拆出的完整原始帧写入 raw_dir。
+    "raw_capture_enabled": true,
+    // raw_capture_max_frames：单次采样最多写入多少原始帧；0 表示不限制。
+    "raw_capture_max_frames": 10000
   },
   // thresholds：测试准入阈值，报告判定 PASS/FAIL 时使用。
   "thresholds": {

@@ -16,6 +16,26 @@ from typing import Any
 from libs.protocols.h2_txt_parse import H2_TEXT_SOF, parse_h2_pointcloud_frame
 from network_test.automation.config import DeviceConfig, hex_to_bytes
 from network_test.automation.metrics import PacketInfo, StreamMetrics, StreamStats
+from network_test.automation.raw_capture import RawFrameCapture
+
+
+def _parse_h1_tail_timestamp(frame: bytes, point_count: int) -> float:
+    """
+    解析 H1 点云帧尾部时间戳。
+
+    实测帧尾为 `CC CC + seconds_u32_be + fractional_u32_be + checksum`。
+    fractional_u32_be 是 2**32 分辨率的小数秒，不是十进制纳秒。
+    """
+    points_end = 22 + 4 * max(0, int(point_count))
+    if len(frame) <= points_end + 1:
+        return 0.0
+    tail = frame[points_end:-1]
+    if len(tail) < 8:
+        return 0.0
+    timestamp_bytes = tail[-8:]
+    seconds = int.from_bytes(timestamp_bytes[:4], "big")
+    fractional = int.from_bytes(timestamp_bytes[4:], "big")
+    return float(seconds) + float(fractional) / float(2**32)
 
 
 class RadarClientError(RuntimeError):
@@ -144,11 +164,14 @@ class BaseRadarClient(ABC):
             verify_checksum=False,
         )
         if parsed:
+            timestamp = _parse_h1_tail_timestamp(frame, int(parsed["point_count"]))
+            if timestamp <= 0:
+                timestamp = float(parsed.get("timestamp") or 0)
             return PacketInfo(
                 scan_id=int(parsed["scan_cnt"]),
                 packet_id=int(parsed["seq_num"]),
                 point_count=int(parsed["point_count"]),
-                timestamp=(parsed.get("timestamp") or 0),
+                timestamp=timestamp,
                 raw_length=len(frame),
                 parse_source="h1_text_frame",
             )
@@ -168,12 +191,20 @@ class BaseRadarClient(ABC):
                 return None
         return None
 
-    def read_stream_stats(self, *, duration_s: float, max_cycles: int | None = None) -> StreamStats:
+    def read_stream_stats(
+        self,
+        *,
+        duration_s: float,
+        max_cycles: int | None = None,
+        raw_output_dir: str | None = None,
+        raw_capture_max_frames: int = 0,
+    ) -> StreamStats:
         """
         读取连续数据流并返回统计结果。
 
         `max_cycles` 表示收满多少「完整圈」（每圈 expected_packets_per_scan 个包号齐全），
         不是见到多少个不同圈号就停。`duration_s` 用于长稳窗口；二者先达到任一条件即停止。
+        传入 `raw_output_dir` 时，会把拆出的完整应用层帧写为 JSONL，便于现场复盘原始数据。
         """
         if self.sock is None:
             raise RadarClientError("雷达未连接，不能读取数据流")
@@ -187,34 +218,71 @@ class BaseRadarClient(ABC):
         frame_index = 0
         self.sock.settimeout(float(self.config.recv_timeout_s))
         stop_after_cycles = False
+        raw_capture = (
+            RawFrameCapture(
+                raw_output_dir,
+                model=self.model,
+                host=self.config.host,
+                max_frames=raw_capture_max_frames,
+            )
+            if raw_output_dir
+            else None
+        )
 
-        while time.monotonic() < deadline:
-            if stop_after_cycles:
-                break
-            try:
-                chunk = self.sock.recv(65536)
-            except socket.timeout:
-                continue
-            except OSError as exc:
-                self.last_error = str(exc)
-                raise RadarClientError(f"读取数据流失败: {exc}") from exc
-
-            if not chunk:
-                break
-            self._rx_buffer.extend(chunk)
-
-            for frame in self.pop_complete_frames():
-                packet = self.decode_packet(frame, frame_index)
-                frame_index += 1
-                if packet is None:
-                    metrics.add_parse_error(f"无法解析帧，长度={len(frame)}")
-                    continue
-                metrics.add_packet(packet)
-                if max_cycles is not None and metrics.completed_scan_count() >= int(max_cycles):
-                    stop_after_cycles = True
+        try:
+            while time.monotonic() < deadline:
+                if stop_after_cycles:
                     break
+                try:
+                    chunk = self.sock.recv(65536)
+                except socket.timeout:
+                    continue
+                except OSError as exc:
+                    self.last_error = str(exc)
+                    raise RadarClientError(f"读取数据流失败: {exc}") from exc
 
-        return metrics.finish()
+                if not chunk:
+                    break
+                self._rx_buffer.extend(chunk)
+
+                for frame in self.pop_complete_frames():
+                    received_at_s = time.monotonic()
+                    received_wall_at_s = time.time()
+                    packet = self.decode_packet(frame, frame_index)
+                    if packet is not None:
+                        packet.received_at_s = received_at_s
+                        packet.received_wall_at_s = received_wall_at_s
+                    if raw_capture is not None:
+                        raw_capture.write_frame(
+                            frame_index=frame_index,
+                            received_at_s=received_wall_at_s,
+                            frame=frame,
+                            packet=packet,
+                        )
+                    frame_index += 1
+                    if packet is None:
+                        metrics.add_parse_error(f"无法解析帧，长度={len(frame)}")
+                        continue
+                    metrics.add_packet(packet)
+                    if max_cycles is not None and metrics.completed_scan_count() >= int(max_cycles):
+                        stop_after_cycles = True
+                        break
+
+            stats = metrics.finish()
+            if raw_capture is not None:
+                raw_capture.close()
+                stats.raw_capture_path = str(raw_capture.path)
+                stats.raw_frames_captured = raw_capture.frames_written
+                stats.raw_capture_truncated = raw_capture.truncated
+                stats.notes.append(f"原始帧已写入: {raw_capture.path}")
+                if raw_capture.truncated:
+                    stats.notes.append(
+                        f"原始帧抓取达到上限 raw_capture_max_frames={raw_capture.max_frames}，后续帧未落盘"
+                    )
+            return stats
+        finally:
+            if raw_capture is not None:
+                raw_capture.close()
 
     @abstractmethod
     def start_streaming(self) -> None:

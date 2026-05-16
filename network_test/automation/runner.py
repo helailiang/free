@@ -180,6 +180,8 @@ def run_smoke(config: DeviceConfig) -> RunReport:
         stats = client.read_stream_stats(
             duration_s=float(config.stream.sample_duration_s),
             max_cycles=int(config.stream.sample_cycles),
+            raw_output_dir=config.raw_dir if config.stream.raw_capture_enabled else None,
+            raw_capture_max_frames=int(config.stream.raw_capture_max_frames),
         )
         client.stop_streaming()
         stats_dict = stats.to_dict()
@@ -293,7 +295,11 @@ def run_stability(config: DeviceConfig, *, duration_s: float, window_s: float, e
         try:
             client.connect()
             client.start_streaming()
-            stats = client.read_stream_stats(duration_s=min(window_s, max(0.1, end_at - time.monotonic())))
+            stats = client.read_stream_stats(
+                duration_s=min(window_s, max(0.1, end_at - time.monotonic())),
+                raw_output_dir=config.raw_dir if config.stream.raw_capture_enabled else None,
+                raw_capture_max_frames=int(config.stream.raw_capture_max_frames),
+            )
             client.stop_streaming()
             stats_dict = stats.to_dict()
             outcome, category, message = judge_stream_stats(config, stats_dict)

@@ -30,6 +30,8 @@ class PacketInfo:
     raw_length: int = 0
     # 本机收到该包的时刻（time.monotonic 秒）；用于算帧间隔与 max_inter_frame_gap_s。
     received_at_s: float = field(default_factory=time.monotonic)
+    # 本机收到该包的墙钟时刻（Unix 秒）；用于按完整圈完成时刻估算圈间隔。
+    received_wall_at_s: float = field(default_factory=time.time)
     # 解析来源标识，如 h1_text_frame / c2_legacy_offsets；区分 H1 正式解析与 C2 兜底。
     parse_source: str = "protocol"
 
@@ -56,15 +58,35 @@ class StreamStats:
     loss_evaluated_scans: int
     # 因采样窗口边界截断而跳过缺包率统计的不完整圈数。
     boundary_partial_scans_ignored: int
+    # 通过完整圈内设备时间戳计算出的相邻完整圈间隔数量。
+    scan_timestamp_interval_count: int
+    # 通过设备时间戳计算出的平均相邻完整圈间隔，单位秒。
+    scan_timestamp_interval_avg_s: float
+    # 通过设备时间戳计算出的最近两完整圈间隔，单位秒。
+    scan_timestamp_interval_latest_s: float
+    # 设备时间戳平均圈间隔的友好显示值；小于 1 秒时显示 ms。
+    scan_timestamp_interval_avg_display: str
+    # 设备时间戳最近圈间隔的友好显示值；小于 1 秒时显示 ms。
+    scan_timestamp_interval_latest_display: str
+    # 通过本机墙钟“完整圈收齐时刻”计算出的相邻完整圈间隔数量。
+    completed_scan_wall_interval_count: int
+    # 本机墙钟完整圈平均间隔，单位秒。
+    completed_scan_wall_interval_avg_s: float
+    # 本机墙钟最近两完整圈间隔，单位秒。
+    completed_scan_wall_interval_latest_s: float
+    # 本机墙钟完整圈平均间隔的友好显示值；小于 1 秒时显示 ms。
+    completed_scan_wall_interval_avg_display: str
+    # 本机墙钟最近圈间隔的友好显示值；小于 1 秒时显示 ms。
+    completed_scan_wall_interval_latest_display: str
     # 各帧 point_count 之和；粗看点云吞吐，不替代点数正确性校验。
     points_received: int
     # 无法按协议解析的帧次数；>0 时优先查粘包、校验或固件版本。
     parse_errors: int
     # 相同 (scan_id, packet_id) 重复到达次数；网络重传或重复订阅时上升。
     duplicate_packets: int
-    # 按每圈应有包数推算的缺包总数；与 loss_rate_percent 分子一致。
+    # 在可判定圈内按每圈应有包数推算的缺包总数；与 loss_rate_percent 分子一致。
     missing_packets: int
-    # 理论应收包总数 = 圈数 × expected_packets_per_scan；作缺包率分母。
+    # 理论应收包总数 = 参与缺包率统计的圈数 × expected_packets_per_scan。
     expected_packets: int
     # 缺包率（%）= missing_packets / expected_packets × 100；与 thresholds 中 stream 阈值比对。
     loss_rate_percent: float
@@ -78,6 +100,12 @@ class StreamStats:
     longest_data_gap_s: float = 0.0
     # 人工或脚本附带的说明字符串列表，如解析失败摘要、现场备注。
     notes: list[str] = field(default_factory=list)
+    # 原始帧 JSONL 落盘路径；未开启抓包时为空字符串。
+    raw_capture_path: str = ""
+    # 实际写入原始帧文件的帧数。
+    raw_frames_captured: int = 0
+    # 原始帧抓取是否因 raw_capture_max_frames 上限而截断。
+    raw_capture_truncated: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """转换为基础类型字典，便于 JSON 序列化和报告模板复用。"""
@@ -105,6 +133,10 @@ class StreamMetrics:
         self.reconnect_count = 0
         self.notes: list[str] = []
         self._scan_packets: dict[int, set[int]] = {}
+        self._scan_timestamps: dict[int, float] = {}
+        self._completed_scan_ids: set[int] = set()
+        self._completed_scan_wall_times: list[tuple[int, float]] = []
+        self._completed_scan_device_timestamps: list[tuple[int, float | None]] = []
         self._packet_keys: set[tuple[int, int]] = set()
         self._receive_times: list[float] = []
 
@@ -119,7 +151,24 @@ class StreamMetrics:
         if key in self._packet_keys:
             self.duplicate_packets += 1
         self._packet_keys.add(key)
-        self._scan_packets.setdefault(int(packet.scan_id), set()).add(int(packet.packet_id))
+        scan_id = int(packet.scan_id)
+        self._scan_packets.setdefault(scan_id, set()).add(int(packet.packet_id))
+        if (
+            scan_id not in self._scan_timestamps
+            and math.isfinite(float(packet.timestamp))
+            and float(packet.timestamp) > 0
+        ):
+            self._scan_timestamps[scan_id] = float(packet.timestamp)
+
+        if (
+            self.expected_packets_per_scan > 0
+            and scan_id not in self._completed_scan_ids
+            and len(self._scan_packets[scan_id]) >= self.expected_packets_per_scan
+        ):
+            self._completed_scan_ids.add(scan_id)
+            self._completed_scan_wall_times.append((scan_id, float(packet.received_wall_at_s)))
+            timestamp = self._scan_timestamps.get(scan_id)
+            self._completed_scan_device_timestamps.append((scan_id, timestamp))
 
     def add_parse_error(self, note: str | None = None) -> None:
         """记录协议帧长度、校验、字段范围等解析失败事件。"""
@@ -169,6 +218,41 @@ class StreamMetrics:
             if scan_id not in boundary_scan_ids
         ]
 
+    @staticmethod
+    def _format_interval(value_s: float) -> str:
+        """格式化时间间隔：小于 1 秒时用 ms，否则用 s。"""
+        if not math.isfinite(value_s) or value_s < 0:
+            return ""
+        if value_s < 1.0:
+            return f"{value_s * 1000.0:.3f} ms"
+        return f"{value_s:.4f} s"
+
+    @classmethod
+    def _interval_summary(cls, values: list[float | None]) -> dict[str, object]:
+        """汇总相邻完整圈时间间隔。"""
+        intervals = [
+            b - a
+            for a, b in zip(values, values[1:])
+            if a is not None and b is not None and math.isfinite(a) and math.isfinite(b) and b >= a
+        ]
+        if not intervals:
+            return {
+                "count": 0,
+                "avg_s": 0.0,
+                "latest_s": 0.0,
+                "avg_display": "",
+                "latest_display": "",
+            }
+        avg_s = sum(intervals) / len(intervals)
+        latest_s = intervals[-1]
+        return {
+            "count": len(intervals),
+            "avg_s": round(avg_s, 6),
+            "latest_s": round(latest_s, 6),
+            "avg_display": cls._format_interval(avg_s),
+            "latest_display": cls._format_interval(latest_s),
+        }
+
     def finish(self) -> StreamStats:
         """计算最终统计值，所有除法都做空数据保护，避免设备未连接时二次报错。"""
         now = time.monotonic()
@@ -206,6 +290,12 @@ class StreamMetrics:
             notes.append(
                 f"缺包率统计已忽略 {boundary_partial_scans_ignored} 个窗口边界不完整圈"
             )
+        device_interval_summary = self._interval_summary(
+            [timestamp for _, timestamp in self._completed_scan_device_timestamps]
+        )
+        wall_interval_summary = self._interval_summary(
+            [wall_time for _, wall_time in self._completed_scan_wall_times]
+        )
 
         return StreamStats(
             model=self.model,
@@ -217,6 +307,16 @@ class StreamMetrics:
             completed_scans=completed_scans,
             loss_evaluated_scans=len(loss_evaluation_scan_items),
             boundary_partial_scans_ignored=boundary_partial_scans_ignored,
+            scan_timestamp_interval_count=int(device_interval_summary["count"]),
+            scan_timestamp_interval_avg_s=float(device_interval_summary["avg_s"]),
+            scan_timestamp_interval_latest_s=float(device_interval_summary["latest_s"]),
+            scan_timestamp_interval_avg_display=str(device_interval_summary["avg_display"]),
+            scan_timestamp_interval_latest_display=str(device_interval_summary["latest_display"]),
+            completed_scan_wall_interval_count=int(wall_interval_summary["count"]),
+            completed_scan_wall_interval_avg_s=float(wall_interval_summary["avg_s"]),
+            completed_scan_wall_interval_latest_s=float(wall_interval_summary["latest_s"]),
+            completed_scan_wall_interval_avg_display=str(wall_interval_summary["avg_display"]),
+            completed_scan_wall_interval_latest_display=str(wall_interval_summary["latest_display"]),
             points_received=self.points_received,
             parse_errors=self.parse_errors,
             duplicate_packets=self.duplicate_packets,
