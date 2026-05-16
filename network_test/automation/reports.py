@@ -18,6 +18,35 @@ from pathlib import Path
 from typing import Any
 
 
+def _escape_json_pretty(value: Any) -> str:
+    """将值格式化为 JSON 字符串并做 HTML 转义，嵌入 `<pre>` 时使用。"""
+    try:
+        raw = json.dumps(value, ensure_ascii=False, indent=2, default=str)
+    except TypeError:
+        raw = json.dumps(str(value), ensure_ascii=False, indent=2)
+    return html.escape(raw)
+
+
+def _metrics_display_dict(metrics: dict[str, Any]) -> dict[str, Any]:
+    """用于展示/说明列的指标字典，排除嵌套的 `metric_explanations`。"""
+    return {k: v for k, v in metrics.items() if k != "metric_explanations"}
+
+
+def _render_case_metrics_value_cell(metrics: dict[str, Any]) -> str:
+    """用例「指标」列：仅展示监控指标数值（JSON），不含说明字典。"""
+    display_metrics = _metrics_display_dict(metrics)
+    return f'<div class="case-metrics"><pre>{_escape_json_pretty(display_metrics)}</pre></div>'
+
+
+def _render_case_metrics_explain_cell(metrics: dict[str, Any]) -> str:
+    """
+    用例「说明」列：直接输出 `metric_explanations` 的 JSON（无该键或非 dict 时输出空对象）。
+    """
+    raw_exp = metrics.get("metric_explanations")
+    payload: Any = raw_exp if isinstance(raw_exp, dict) else {}
+    return f'<div class="case-metrics-explain"><pre>{_escape_json_pretty(payload)}</pre></div>'
+
+
 @dataclass(slots=True)
 class CaseResult:
     """单条 Pytest 用例或 runner 步骤的报告记录。"""
@@ -132,6 +161,8 @@ class ReportWriter:
         """写入无外部依赖 HTML，便于离线测试电脑直接打开。"""
         rows = []
         for case in report.cases:
+            value_cell = _render_case_metrics_value_cell(case.metrics)
+            explain_cell = _render_case_metrics_explain_cell(case.metrics)
             rows.append(
                 "<tr>"
                 f"<td>{html.escape(case.name)}</td>"
@@ -139,7 +170,8 @@ class ReportWriter:
                 f"<td>{html.escape(case.category)}</td>"
                 f"<td>{case.duration_s:.3f}</td>"
                 f"<td>{html.escape(case.message)}</td>"
-                f"<td><pre>{html.escape(json.dumps(case.metrics, ensure_ascii=False, indent=2))}</pre></td>"
+                f'<td class="col-metrics">{value_cell}</td>'
+                f'<td class="col-explain">{explain_cell}</td>'
                 "</tr>"
             )
 
@@ -154,10 +186,13 @@ class ReportWriter:
   <title>{html.escape(report.title)}</title>
   <style>
     body {{ font-family: Arial, sans-serif; margin: 24px; line-height: 1.5; }}
-    table {{ border-collapse: collapse; width: 100%; }}
+    table {{ border-collapse: collapse; width: 100%; table-layout: auto; }}
     th, td {{ border: 1px solid #ccc; padding: 8px; vertical-align: top; }}
     th {{ background: #f3f3f3; }}
-    pre {{ white-space: pre-wrap; margin: 0; }}
+    th.col-metrics, th.col-explain {{ min-width: 12em; }}
+    td.col-metrics, td.col-explain {{ width: auto; max-width: none; height: auto; }}
+    pre {{ white-space: pre-wrap; word-break: break-word; margin: 0; }}
+    .case-metrics pre, .case-metrics-explain pre {{ max-height: none; overflow: visible; }}
   </style>
 </head>
 <body>
@@ -172,7 +207,7 @@ class ReportWriter:
   <ul>{notes}</ul>
   <h2>用例结果</h2>
   <table>
-    <thead><tr><th>用例</th><th>结果</th><th>分类</th><th>耗时(s)</th><th>信息</th><th>指标</th></tr></thead>
+    <thead><tr><th>用例</th><th>结果</th><th>分类</th><th>耗时(s)</th><th>信息</th><th class="col-metrics">指标</th><th class="col-explain">说明</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
   </table>
 </body>

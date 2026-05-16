@@ -14,6 +14,47 @@
 | 长稳窗口测试 | REL-01、NET-02、SYS-01 | `network_test/automation/runner.py` | 半自动 | 每个窗口输出帧数、圈数、缺包率、最大数据间隔和失败原因 |
 | 人工事件对齐记录 | HW-01、HW-02、NET-02、NET-03、SYS-01 | `network_test/automation/FIELD_VALIDATION.md` | 半自动 | 记录拔网线、电源扰动、网络损伤等时间点，报告保留事件内容 |
 
+### 1.1 后续新增 Pytest 测试项：指标与指标说明（须遵守）
+
+凡在 `network_test/automation/tests/` 下新增需要写入报告的集成用例，**交付前**应按本节统一挂上「指标」与「指标说明」，便于 HTML 与 JSON 一致、现场可对照字段含义。
+
+**数据形态**
+
+1. 用例在 `attach_metrics(request.node, payload)` 中传入 **`payload` 为 `dict`**。
+2. **`metric_explanations`**（可选但强烈推荐）：值为 `dict[str, str]`，**键与监控指标字段名一致**，值为该字段的中文（或中英）说明（含义、单位、与配置/阈值的对应关系）。参考  
+   `tests/test_stream.py` 中的 `STREAM_SAMPLE_METRIC_EXPLANATIONS` 与 `_stream_stats_report_payload()`。
+3. **其余键**：本条用例的**实测监控指标**（数值、字符串、列表等）；勿把长篇说明混在普通字段里，说明集中到 `metric_explanations`。
+
+**HTML 报告呈现**（`network_test/automation/reports.py` → `write_html`）
+
+| 表格列 | 内容 |
+|--------|------|
+| **指标** | `payload` 去掉 `metric_explanations` 后的对象，格式化为 JSON（`pre` 块）。 |
+| **说明** | 仅 `metric_explanations` 整段格式化为 JSON；若无该键或非 `dict`，显示 `{}`。 |
+
+**JSON / CSV**
+
+- 仍保留 **`payload` 全量**（含 `metric_explanations`），与 HTML 不丢字段。
+- 序列化使用 `default=str`，避免不可 JSON 化对象导致写报告失败。
+
+**最小示例**
+
+```python
+attach_metrics(
+    request.node,
+    {
+        "reply_bytes": len(reply),
+        "reply_hex_prefix": reply[:32].hex(" ").upper(),
+        "metric_explanations": {
+            "reply_bytes": "应答原始字节长度。",
+            "reply_hex_prefix": "应答前若干字节的十六进制预览（空格分隔），用于协议核对。",
+        },
+    },
+)
+```
+
+后续扩展 H1 指令、连续取数、恢复测试等，均应按需补全 `metric_explanations` 与实测键的对应关系。
+
 ## 2. 配置文件说明
 
 配置文件位于 `network_test/automation/configs/`。当前示例文件使用 JSONC 写法，也就是普通 JSON 加 `//` 注释。程序会自动去掉注释后解析。
@@ -324,7 +365,7 @@ def test_h1_read_version(radar_client, radar_config):
     assert raw
 ```
 
-用 `attach_metrics(request.node, {...})` 把解析结果写入 JSON 报告。运行：
+用 `attach_metrics(request.node, {...})` 把解析结果写入报告；**指标与 `metric_explanations` 的写法须遵守上文 §1.1**。运行：
 
 ```bash
 uv run pytest network_test/automation/tests/test_protocol.py -k version --radar-config network_test/automation/configs/h1.example.json

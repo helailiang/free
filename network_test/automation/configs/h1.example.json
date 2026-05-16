@@ -52,7 +52,7 @@
   // stream：连续取数统计配置，用于 PROT-02、NET-01、REL-01 等用例。
   "stream": {
     // sample_cycles：Pytest 短样本收满多少「完整圈」（每圈 22 包齐全）后停止，不是见到第 N 圈首包就停。
-    "sample_cycles": 5,
+    "sample_cycles": 5000,
     // sample_duration_s：Pytest 短样本最长采集时长，单位秒。
     "sample_duration_s": 10.0,
     // expected_points_per_scan：每圈理论点数，270°/0.1° 常见为 2701。
@@ -64,7 +64,7 @@
     // angle_resolution_deg：角分辨率，单位度。
     "angle_resolution_deg": 0.1,
     // expected_frame_rate_hz：期望扫描频率，单位 Hz。
-    "expected_frame_rate_hz": 30.0
+    "expected_frame_rate_hz": 15.0
   },
   // thresholds：测试准入阈值，报告判定 PASS/FAIL 时使用。
   "thresholds": {
@@ -76,7 +76,7 @@
     "h1_recovery_timeout_s": 5.0,
     // h1_stream_loss_rate_max_percent：H1 应用层缺包率上限。
     "h1_stream_loss_rate_max_percent": 0.5,
-    // frame_rate_tolerance_percent：动态场景帧率波动容差。
+    // frame_rate_tolerance_percent：动态场景帧率波动容差。%
     "frame_rate_tolerance_percent": 10.0
   }
 }

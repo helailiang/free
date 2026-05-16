@@ -1,0 +1,91 @@
+{
+  "title": "C2/H1 Pytest 网络通信自动化测试",
+  "device_name": "H1-样机",
+  "model": "h1",
+  "host": "192.168.1.86",
+  "started_at": "2026-05-16T14:06:18",
+  "passed": false,
+  "outcome_counts": {
+    "failed": 1
+  },
+  "failure_categories": {
+    "general": 1
+  },
+  "summary": {},
+  "notes": [
+    "报告由 Pytest 钩子自动生成。",
+    "pytest exitstatus=1",
+    "生成时间=2026-05-16T14:06:29"
+  ],
+  "cases": [
+    {
+      "name": "automation/tests/test_stream.py::test_stream_sample_quality",
+      "outcome": "failed",
+      "duration_s": 10.169369399984134,
+      "message": "缺包率 0.6364% 超过阈值 0.5%\nassert 0.6364 <= 0.5\n +  where 0.6364 = StreamStats(model='h1', host='192.168.1.86', started_at_s=192623.093, ended_at_s=192633.109, frames_received=3279, scans_seen=150, completed_scans=149, points_received=402577, parse_errors=0, duplicate_packets=0, missing_packets=21, expected_packets=3300, loss_rate_percent=0.6364, frame_rate_hz=327.3762, max_inter_frame_gap_s=0.032, reconnect_count=0, longest_data_gap_s=0.032, notes=[]).loss_rate_percent\n +  and   0.5 = DeviceConfig(model='h1', host='192.168.1.86', port=2111, name='H1-样机', connect_timeout_s=5.0, recv_timeout_s=0.5, report_dir='network_test/automation/reports_output', raw_dir='network_test/automation/raw_output', commands=CommandConfig(h1_login_permission=3, h1_login_password_hex='F4 72 47 44', single_scan_hex='02 02 02 02 00 09 02 30 43', start_stream_hex='02 02 02 02 00 0A 02 31 01 46', stop_stream_hex='02 02 02 02 00 0A 02 31 00 45', c2_query_config_hex='02 02 02 02 00 09 00 1A 2B', read_ip_hex='02 02 02 02 00 09 00 10 21', read_gateway_hex='02 02 02 02 00 09 00 12 23', read_subnet_mask_hex='02 02 02 02 00 09 00 14 25', read_freq_resolution_hex='02 02 02 02 00 09 00 1A 2B'), ping=PingConfig(duration_s=604800.0, pytest_duration_s=10.0, interval_s=1.0, timeout_ms=1000, packet_size=32), stream=StreamConfig(sample_cycles=5000, sample_duration_s=10.0, expected_points_per_scan=2701, expected_packets_per_scan=22, scan_start_deg=-45.0, angle_resolution_deg=0.1, expected_frame_rate_hz=15.0), thresholds=ThresholdConfig(ping_success_rate_min_percent=99.9, protocol_success_rate_min_percent=100.0, c2_recovery_timeout_s=10.0, h1_recovery_timeout_s=5.0, stream_loss_rate_max_percent=1.0, h1_stream_loss_rate_max_percent=0.5, frame_rate_tolerance_percent=10.0)).stream_loss_limit_percent",
+      "category": "general",
+      "metrics": {
+        "model": "h1",
+        "host": "192.168.1.86",
+        "started_at_s": 192623.093,
+        "ended_at_s": 192633.109,
+        "frames_received": 3279,
+        "scans_seen": 150,
+        "completed_scans": 149,
+        "points_received": 402577,
+        "parse_errors": 0,
+        "duplicate_packets": 0,
+        "missing_packets": 21,
+        "expected_packets": 3300,
+        "loss_rate_percent": 0.6364,
+        "frame_rate_hz": 327.3762,
+        "max_inter_frame_gap_s": 0.032,
+        "reconnect_count": 0,
+        "longest_data_gap_s": 0.032,
+        "notes": [],
+        "window_duration_s": 10.016,
+        "implied_scan_rate_hz": 14.8807,
+        "completed_scan_rate_hz": 14.8762,
+        "expected_scan_rate_hz": 15.0,
+        "scan_rate_vs_expected_error_percent": 0.7953,
+        "frame_rate_tolerance_percent_applied": 10.0,
+        "sample_cycles_met": false,
+        "sample_duration_met": true,
+        "metric_explanations": {
+          "model": "设备型号（c2/h1），与配置一致。",
+          "host": "被测雷达 IP。",
+          "started_at_s": "统计窗口开始时刻（time.monotonic 秒），非墙钟。",
+          "ended_at_s": "统计窗口结束时刻；与 started 之差 ≈ 采样时长。",
+          "frames_received": "成功解析并计入统计的 TCP 应用层帧总数。",
+          "scans_seen": "观测到的不重复扫描圈号（scan_id）个数。",
+          "completed_scans": "包号齐全（每圈收满 expected_packets_per_scan）的完整圈数。",
+          "points_received": "各帧点数之和，粗看吞吐；不单独校验每点正确性。",
+          "parse_errors": "无法按协议解析的帧数；>0 时查粘包/校验/固件。",
+          "duplicate_packets": "同一 (圈号, 包号) 重复到达次数。",
+          "missing_packets": "按每圈应有包数推算的缺包总数。",
+          "expected_packets": "理论应收包数 = 参与统计的圈数 × 每圈应有包数。",
+          "loss_rate_percent": "缺包率(%) = missing_packets / expected_packets × 100；与准入阈值比对。",
+          "frame_rate_hz": "平均帧率 = frames_received / 窗口秒数。",
+          "max_inter_frame_gap_s": "相邻两帧接收时间间隔的最大值（秒）。",
+          "reconnect_count": "本窗口内记录的重连次数（本短测通常为 0）。",
+          "longest_data_gap_s": "与 max_inter_frame_gap_s 同源，报告字段兼容用。",
+          "notes": "附加说明字符串列表。",
+          "stream_loss_limit_percent_applied": "本用例实际使用的缺包率准入阈值（%），来自配置 thresholds。",
+          "sample_cycles_applied": "本测传入 read_stream_stats 的 max_cycles：收满多少完整圈后停止。",
+          "sample_duration_s_applied": "本测采样时长上限（秒）；与 sample_cycles 先满足其一即停止收数。",
+          "window_duration_s": "本窗口有效统计时长（秒）= ended_at_s - started_at_s，用于折算频率。",
+          "implied_scan_rate_hz": "推算扫描频率（圈/秒）= frame_rate_hz ÷ expected_packets_per_scan；每圈一包序列为 1 圈。",
+          "completed_scan_rate_hz": "完整圈频率（圈/秒）= completed_scans ÷ window_duration_s；仅统计包号齐全的圈。",
+          "expected_scan_rate_hz": "配置期望扫描频率（Hz），来自 stream.expected_frame_rate_hz。",
+          "scan_rate_vs_expected_error_percent": "|implied_scan_rate_hz - expected_scan_rate_hz| / 期望 × 100；与 frame_rate 容差比对。",
+          "frame_rate_tolerance_percent_applied": "本用例扫描频率相对误差上限（%），来自 thresholds.frame_rate_tolerance_percent。",
+          "sample_cycles_met": "是否已收满 sample_cycles 个完整圈（completed_scans ≥ 配置值）。",
+          "sample_duration_met": "是否已跑满 sample_duration_s 时长上限（window_duration_s ≥ 配置×0.98）。"
+        },
+        "stream_loss_limit_percent_applied": 0.5,
+        "sample_cycles_applied": 5000,
+        "sample_duration_s_applied": 10.0
+      }
+    }
+  ]
+}

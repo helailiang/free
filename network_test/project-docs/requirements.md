@@ -17,6 +17,10 @@
 - 生成 JSON、CSV、HTML 报告。
 - 支持长稳 runner，并允许记录人工网络损伤事件文件路径。
 
+## Pytest 报告字段约定
+
+- 新增集成用例若使用 `attach_metrics`，须按 `network_test/automation/TEST_INSTANCE_IMPLEMENTATION.md` **§1.1** 提供监控指标字典及可选的 `metric_explanations`，以保证 HTML 中「指标」「说明」两列与 JSON 一致。
+
 ## 暂缓功能
 
 - GUI 封装。

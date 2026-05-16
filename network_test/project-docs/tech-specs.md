@@ -28,3 +28,4 @@
 - JSON 保留完整结构化指标。
 - CSV 便于 Excel 查看用例结果。
 - HTML 便于现场交付和非开发人员阅读。
+- **Pytest HTML「用例结果」表**：含 **指标**、**说明** 两列。指标列为除 `metric_explanations` 外的键值 JSON；说明列为 `metric_explanations` 对象的 JSON（无则为 `{}`）。新增用例须遵守 `network_test/automation/TEST_INSTANCE_IMPLEMENTATION.md` **§1.1**。
