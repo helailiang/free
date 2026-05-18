@@ -52,9 +52,9 @@
   // stream：连续取数统计配置，用于 PROT-02、NET-01、REL-01 等用例。
   "stream": {
     // sample_cycles：Pytest 短样本收满多少「完整圈」（每圈 22 包齐全）后停止，不是见到第 N 圈首包就停。
-    "sample_cycles": 5000,
+    "sample_cycles": 500000000,
     // sample_duration_s：Pytest 短样本最长采集时长，单位秒。
-    "sample_duration_s": 10.0,
+    "sample_duration_s": 36000.0,
     // expected_points_per_scan：每圈理论点数，270°/0.1° 常见为 2701。
     "expected_points_per_scan": 2701,
     // expected_packets_per_scan：每圈理论包数，用于估算缺包率。
@@ -68,7 +68,17 @@
     // raw_capture_enabled：是否把 test_stream.py/runner 连续取数拆出的完整原始帧写入 raw_dir。
     "raw_capture_enabled": true,
     // raw_capture_max_frames：单次采样最多写入多少原始帧；0 表示不限制。
-    "raw_capture_max_frames": 10000
+    "raw_capture_max_frames": 10000,
+    // live_metrics_enabled：Pytest 连续取数时是否实时打印核心指标；需配合 pytest -s 查看。
+    "live_metrics_enabled": true,
+    // live_metrics_interval_s：实时指标打印间隔，单位秒。
+    "live_metrics_interval_s": 0.1,
+    // live_dashboard_enabled：是否启动本地浏览器实时仪表盘。
+    "live_dashboard_enabled": true,
+    // live_dashboard_host：实时仪表盘监听地址；本机查看保持 127.0.0.1。
+    "live_dashboard_host": "127.0.0.1",
+    // live_dashboard_port：实时仪表盘首选端口；占用时会自动尝试后续端口。
+    "live_dashboard_port": 8765
   },
   // thresholds：测试准入阈值，报告判定 PASS/FAIL 时使用。
   "thresholds": {

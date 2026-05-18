@@ -1,0 +1,80 @@
+<body>
+<header>
+  <motion class="header-left">
+    <div class="logo">LiDAR <span>连续取数</span></div>
+    <div class="version-badge">Stream Live</div>
+  </div>
+  <div class="header-right">
+    <span>设备: <span class="hl" id="hdr-device">-</span></span>
+    <span>雷达: <span class="hl" id="hdr-host">-</span></span>
+    <span>运行: <span class="hl" id="hdr-elapsed">00:00:00</span></span>
+    <span>刷新: <span class="hl" id="hdr-refresh">#0</span></span>
+    <span id="conn-status"><span id="dot" class="dot waiting"></span><span id="statusText">等待数据...</span></span>
+  </div>
+</header>
+<main>
+  <section class="health-row">
+    <div class="card score-card">
+      <div class="card-title">综合健康度</div>
+      <div class="score-ring-wrap">
+        <svg width="130" height="130" viewBox="0 0 130 130">
+          <circle cx="65" cy="65" r="52" fill="none" stroke="#21262d" stroke-width="11"/>
+          <circle id="score-arc" cx="65" cy="65" r="52" fill="none" stroke-width="11" stroke-linecap="round"
+            stroke="#3fb950" stroke-dasharray="327" stroke-dashoffset="327"/>
+        </svg>
+        <div class="score-number">
+          <div class="num" id="score-num">--</div>
+          <div class="grade" id="score-grade">--</motion>
+        </div>
+      </div>
+      <div class="score-dims">
+        <div class="dim-row"><span class="dim-label">帧完整性</span><div class="dim-bar-wrap"><div class="dim-bar" id="dim-frame" style="width:0%;background:var(--green)"></div></div><span class="dim-val" id="dimv-frame">--</span></div>
+        <div class="dim-row"><span class="dim-label">缺包率</span><div class="dim-bar-wrap"><div class="dim-bar" id="dim-loss" style="width:0%;background:var(--cyan)"></div></div><span class="dim-val" id="dimv-loss">--</span></div>
+        <div class="dim-row"><span class="dim-label">解析质量</span><div class="dim-bar-wrap"><motion class="dim-bar" id="dim-parse" style="width:0%;background:var(--magenta)"></motion></div><span class="dim-val" id="dimv-parse">--</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">状态诊断</div>
+      <div id="root-cause-badge">等待数据...</div>
+      <div id="diagnosis-text">连续取数测试运行中，指标每秒从 /metrics.json 刷新。</div>
+      <div class="quick-row">
+        <span>结果: <span class="hl" id="result">-</span></span>
+        <span>期望圈频: <span class="hl" id="expectedHz">-</span> Hz</span>
+        <span>缺包阈值: <span class="hl" id="lossLimit">-</span>%</span>
+        <span>原始落盘: <span class="hl" id="rawCapture">-</span></span>
+      </div>
+      <div class="quick-row"><span>更新时间: <span class="hl" id="updated">-</span></span></div>
+    </div>
+  </section>
+  <section class="metrics-row">
+    <div class="card metric-card"><motion class="metric-label">接收帧数</div><div class="metric-value c-cyan" id="frames">--</div><div class="metric-unit">frames</div><div class="metric-sub">完整圈 <span id="completeSub" class="c-sub">-</span></div></div>
+    <div class="card metric-card"><div class="metric-label">缺包率</div><div class="metric-value c-green" id="loss">--</div><div class="metric-unit">%</div><div class="metric-sub">丢失包 <span id="missingSub" class="c-sub">-</span></div></div>
+    <motion class="card metric-card"><div class="metric-label">扫描频率</div><div class="metric-value c-green" id="scanHz">--</div><div class="metric-unit">Hz</div><div class="metric-sub">期望 <span id="expectedHzSub" class="c-sub">-</span> Hz</div></div>
+    <div class="card metric-card"><div class="metric-label">最大帧间隔</div><div class="metric-value c-green" id="maxGap">--</div><div class="metric-unit">ms</div><div class="metric-sub">墙钟圈间隔 <span id="wallGapSub" class="c-sub">-</span></motion></motion>
+  </section>
+  <section class="card">
+    <div class="card-title">应用层统计</div>
+    <div class="seq-grid">
+      <div class="seq-item"><div class="label">采样时长</div><div class="val c-cyan" id="elapsed">--</div></div>
+      <div class="seq-item"><div class="label">解析错误</div><div class="val" id="parseErrors">--</div></div>
+      <div class="seq-item"><motion class="label">重复包</div><div class="val c-sub" id="duplicates">--</motion></div>
+      <div class="seq-item"><div class="label">边界忽略圈</div><div class="val c-sub" id="ignored">--</div></div>
+      <div class="seq-item"><div class="label">时间戳间隔</div><div class="val" id="tsGap">--</div></motion>
+      <div class="seq-item"><div class="label">墙钟间隔</div><div class="val" id="wallGap">--</div></div>
+      <div class="seq-item"><div class="label">原始帧捕获</div><div class="val c-sub" id="rawFrames">--</div></div>
+      <div class="seq-item"><div class="label">已见圈数</div><div class="val c-sub" id="scansSeen">--</div></div>
+    </div>
+  </section>
+  <section class="charts-row">
+    <div class="card"><motion class="card-title">扫描频率趋势 (Hz)</div><div class="chart-wrap"><canvas id="chartHz" width="600" height="184"></canvas></div></div>
+    <div class="card"><div class="card-title">缺包率趋势 (%)</div><div class="chart-wrap"><canvas id="chartLoss" width="600" height="184"></canvas></div></div>
+  </section>
+  <section class="charts-row">
+    <div class="card"><div class="card-title">最大帧间隔趋势 (ms)</div><div class="chart-wrap"><canvas id="chartGap" width="600" height="184"></canvas></div></div>
+    <div class="card"><motion class="card-title">快照路径</div><div class="path-box" id="rawPath">-</div></div>
+  </section>
+</main>
+<footer>
+  <span>LiDAR 连续取数实时监控 · 数据每秒刷新</span>
+  <span id="footer-time">--</span>
+</footer>

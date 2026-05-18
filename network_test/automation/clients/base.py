@@ -11,7 +11,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import socket
 import time
-from typing import Any
+from typing import Any, Callable
 
 from libs.protocols.h2_txt_parse import H2_TEXT_SOF, parse_h2_pointcloud_frame
 from network_test.automation.config import DeviceConfig, hex_to_bytes
@@ -198,6 +198,8 @@ class BaseRadarClient(ABC):
         max_cycles: int | None = None,
         raw_output_dir: str | None = None,
         raw_capture_max_frames: int = 0,
+        live_metrics_callback: Callable[[StreamStats], None] | None = None,
+        live_metrics_interval_s: float = 1.0,
     ) -> StreamStats:
         """
         读取连续数据流并返回统计结果。
@@ -205,6 +207,7 @@ class BaseRadarClient(ABC):
         `max_cycles` 表示收满多少「完整圈」（每圈 expected_packets_per_scan 个包号齐全），
         不是见到多少个不同圈号就停。`duration_s` 用于长稳窗口；二者先达到任一条件即停止。
         传入 `raw_output_dir` 时，会把拆出的完整应用层帧写为 JSONL，便于现场复盘原始数据。
+        传入 `live_metrics_callback` 时，会按 `live_metrics_interval_s` 周期回调当前统计快照。
         """
         if self.sock is None:
             raise RadarClientError("雷达未连接，不能读取数据流")
@@ -218,6 +221,8 @@ class BaseRadarClient(ABC):
         frame_index = 0
         self.sock.settimeout(float(self.config.recv_timeout_s))
         stop_after_cycles = False
+        progress_interval_s = max(0.1, float(live_metrics_interval_s))
+        next_progress_at = time.monotonic() + progress_interval_s
         raw_capture = (
             RawFrameCapture(
                 raw_output_dir,
@@ -229,6 +234,21 @@ class BaseRadarClient(ABC):
             else None
         )
 
+        def emit_live_metrics(*, force: bool = False) -> None:
+            nonlocal next_progress_at
+            if live_metrics_callback is None:
+                return
+            now_s = time.monotonic()
+            if not force and now_s < next_progress_at:
+                return
+            stats_snapshot = metrics.finish()
+            if raw_capture is not None:
+                stats_snapshot.raw_capture_path = str(raw_capture.path)
+                stats_snapshot.raw_frames_captured = raw_capture.frames_written
+                stats_snapshot.raw_capture_truncated = raw_capture.truncated
+            live_metrics_callback(stats_snapshot)
+            next_progress_at = now_s + progress_interval_s
+
         try:
             while time.monotonic() < deadline:
                 if stop_after_cycles:
@@ -236,6 +256,7 @@ class BaseRadarClient(ABC):
                 try:
                     chunk = self.sock.recv(65536)
                 except socket.timeout:
+                    emit_live_metrics()
                     continue
                 except OSError as exc:
                     self.last_error = str(exc)
@@ -267,6 +288,7 @@ class BaseRadarClient(ABC):
                     if max_cycles is not None and metrics.completed_scan_count() >= int(max_cycles):
                         stop_after_cycles = True
                         break
+                emit_live_metrics()
 
             stats = metrics.finish()
             if raw_capture is not None:

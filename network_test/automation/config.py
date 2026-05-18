@@ -70,6 +70,11 @@ class StreamConfig:
     expected_frame_rate_hz: float = 30.0
     raw_capture_enabled: bool = False
     raw_capture_max_frames: int = 10000
+    live_metrics_enabled: bool = False
+    live_metrics_interval_s: float = 1.0
+    live_dashboard_enabled: bool = False
+    live_dashboard_host: str = "127.0.0.1"
+    live_dashboard_port: int = 8765
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any] | None) -> "StreamConfig":

@@ -7,10 +7,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 
 from network_test.automation.clients.base import RadarClientError
 from network_test.automation.config import DeviceConfig
+from network_test.automation.live_dashboard import LiveDashboardSession
 from network_test.automation.metrics import StreamStats
 
 from .conftest import attach_metrics
@@ -50,6 +53,11 @@ STREAM_SAMPLE_METRIC_EXPLANATIONS: dict[str, str] = {
     "raw_capture_path": "原始帧 JSONL 落盘路径；未开启抓取时为空。",
     "raw_frames_captured": "实际写入原始帧文件的帧数。",
     "raw_capture_truncated": "原始帧抓取是否因 raw_capture_max_frames 上限而截断。",
+    "live_metrics_enabled_applied": "本次是否启用实时指标打印。",
+    "live_metrics_interval_s_applied": "实时指标打印间隔，单位秒。",
+    "live_dashboard_enabled_applied": "本次是否启用本地浏览器实时仪表盘。",
+    "live_dashboard_url": "本地浏览器实时仪表盘地址；测试运行期间可打开查看。",
+    "live_dashboard_snapshot_path": "实时仪表盘读取的最新指标 JSON 快照路径。",
     "stream_loss_limit_percent_applied": "本用例实际使用的缺包率准入阈值（%），来自配置 thresholds。",
     "sample_cycles_applied": "本测传入 read_stream_stats 的 max_cycles：收满多少完整圈后停止。",
     "sample_duration_s_applied": "本测采样时长上限（秒）；与 sample_cycles 先满足其一即停止收数。",
@@ -112,15 +120,36 @@ def _stream_frequency_metrics(stats: StreamStats, radar_config: DeviceConfig) ->
     }
 
 
-def _stream_stats_report_payload(
+def _print_live_stream_metrics(stats: StreamStats, radar_config: DeviceConfig) -> None:
+    """周期性打印核心流指标；配合 `pytest -s` 可实时观察。"""
+    freq = _stream_frequency_metrics(stats, radar_config)
+    window_s = max(0.0, float(stats.ended_at_s - stats.started_at_s))
+    line = (
+        "[stream-live] "
+        f"t={window_s:6.2f}s "
+        f"frames={stats.frames_received} "
+        f"scans={stats.scans_seen} "
+        f"complete={stats.completed_scans} "
+        f"loss={stats.loss_rate_percent:.4f}% "
+        f"scan_hz={freq['implied_scan_rate_hz']:.4f} "
+        f"ts_gap={stats.scan_timestamp_interval_avg_display or '-'} "
+        f"wall_gap={stats.completed_scan_wall_interval_avg_display or '-'} "
+        f"max_gap={stats.max_inter_frame_gap_s:.4f}s"
+    )
+    print(line, flush=True)
+
+
+def _stream_stats_base_payload(
     stats: StreamStats,
     *,
     radar_config: DeviceConfig,
     stream_loss_limit_percent: float,
     sample_cycles: int,
     sample_duration_s: float,
+    live_dashboard_url: str = "",
+    live_dashboard_snapshot_path: str = "",
 ) -> dict[str, object]:
-    """合并实测值、频率推导、指标说明与本次测试配置，供 attach_metrics 写入 JSON/HTML。"""
+    """合并实测值、频率推导与本次测试配置，供实时 UI 和最终报告复用。"""
     freq = _stream_frequency_metrics(stats, radar_config)
     cycles_ok, duration_ok, window_s = _sample_stop_conditions_met(stats, radar_config)
     return {
@@ -132,6 +161,36 @@ def _stream_stats_report_payload(
         "stream_loss_limit_percent_applied": stream_loss_limit_percent,
         "sample_cycles_applied": sample_cycles,
         "sample_duration_s_applied": sample_duration_s,
+        "live_metrics_enabled_applied": bool(radar_config.stream.live_metrics_enabled),
+        "live_metrics_interval_s_applied": float(radar_config.stream.live_metrics_interval_s),
+        "live_dashboard_enabled_applied": bool(radar_config.stream.live_dashboard_enabled),
+        "live_dashboard_url": live_dashboard_url,
+        "live_dashboard_snapshot_path": live_dashboard_snapshot_path,
+    }
+
+
+def _stream_stats_report_payload(
+    stats: StreamStats,
+    *,
+    radar_config: DeviceConfig,
+    stream_loss_limit_percent: float,
+    sample_cycles: int,
+    sample_duration_s: float,
+    live_dashboard_url: str = "",
+    live_dashboard_snapshot_path: str = "",
+) -> dict[str, object]:
+    """合并实测值、频率推导、指标说明与本次测试配置，供 attach_metrics 写入 JSON/HTML。"""
+    return {
+        **_stream_stats_base_payload(
+            stats,
+            radar_config=radar_config,
+            stream_loss_limit_percent=stream_loss_limit_percent,
+            sample_cycles=sample_cycles,
+            sample_duration_s=sample_duration_s,
+            live_dashboard_url=live_dashboard_url,
+            live_dashboard_snapshot_path=live_dashboard_snapshot_path,
+        ),
+        "metric_explanations": STREAM_SAMPLE_METRIC_EXPLANATIONS,
     }
 
 
@@ -167,6 +226,48 @@ def _print_stream_sample_legend(
 @pytest.mark.integration
 def test_stream_sample_quality(radar_client, radar_config, request: pytest.FixtureRequest) -> None:
     """短时间连续取数：帧/缺包统计 + 扫描频率推算与期望对比（expected_frame_rate_hz、容差）。"""
+    live_dashboard: LiveDashboardSession | None = None
+    live_dashboard_url = ""
+    live_dashboard_snapshot_path = ""
+    if radar_config.stream.live_dashboard_enabled:
+        try:
+            live_dashboard = LiveDashboardSession(
+                radar_config.report_dir,
+                model=radar_config.normalized_model,
+                host=radar_config.host,
+                bind_host=str(radar_config.stream.live_dashboard_host),
+                preferred_port=int(radar_config.stream.live_dashboard_port),
+            ).start()
+            live_dashboard_url = live_dashboard.url
+            live_dashboard_snapshot_path = str(live_dashboard.snapshot_path)
+            print(f"[stream-dashboard] {live_dashboard_url}", flush=True)
+        except RuntimeError as exc:
+            print(f"[stream-dashboard] start failed: {exc}", flush=True)
+
+    def on_live_metrics(snapshot: StreamStats) -> None:
+        if radar_config.stream.live_metrics_enabled:
+            _print_live_stream_metrics(snapshot, radar_config)
+        if live_dashboard is not None:
+            live_dashboard.update(
+                _stream_stats_base_payload(
+                    snapshot,
+                    radar_config=radar_config,
+                    stream_loss_limit_percent=float(radar_config.stream_loss_limit_percent),
+                    sample_cycles=int(radar_config.stream.sample_cycles),
+                    sample_duration_s=float(radar_config.stream.sample_duration_s),
+                    live_dashboard_url=live_dashboard_url,
+                    live_dashboard_snapshot_path=live_dashboard_snapshot_path,
+                )
+            )
+            # 与浏览器打开的 JSON 快照同一次推送；用 pytest -s 对照 http://127.0.0.1:8765/ 是否同步变数字。
+            print(
+                "[stream-dashboard] push "
+                f"{datetime.now().isoformat(timespec='seconds')} "
+                f"frames={snapshot.frames_received} "
+                f"completed_scans={snapshot.completed_scans}",
+                flush=True,
+            )
+
     try:
         radar_client.connect()
         radar_client.start_streaming()
@@ -175,6 +276,10 @@ def test_stream_sample_quality(radar_client, radar_config, request: pytest.Fixtu
             max_cycles=int(radar_config.stream.sample_cycles),
             raw_output_dir=radar_config.raw_dir if radar_config.stream.raw_capture_enabled else None,
             raw_capture_max_frames=int(radar_config.stream.raw_capture_max_frames),
+            live_metrics_callback=on_live_metrics
+            if (radar_config.stream.live_metrics_enabled or live_dashboard is not None)
+            else None,
+            live_metrics_interval_s=float(radar_config.stream.live_metrics_interval_s),
         )
         radar_client.stop_streaming()
     except RadarClientError as exc:
@@ -186,7 +291,11 @@ def test_stream_sample_quality(radar_client, radar_config, request: pytest.Fixtu
         stream_loss_limit_percent=float(radar_config.stream_loss_limit_percent),
         sample_cycles=int(radar_config.stream.sample_cycles),
         sample_duration_s=float(radar_config.stream.sample_duration_s),
+        live_dashboard_url=live_dashboard_url,
+        live_dashboard_snapshot_path=live_dashboard_snapshot_path,
     )
+    if live_dashboard is not None:
+        live_dashboard.update({k: v for k, v in metrics.items() if k != "metric_explanations"}, status="final")
     row_for_print = {k: v for k, v in metrics.items() if k != "metric_explanations"}
     attach_metrics(request.node, metrics)
     _print_stream_sample_legend(
